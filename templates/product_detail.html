@@ -1,0 +1,256 @@
+{% extends "consumer_base.html" %}
+
+{% block title %}{{ product.name }}{% endblock %}
+
+{% block content %}
+    <style>
+        /* 页面背景 */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #f0f9ff, #ccebf9); /* 柔和渐变背景 */
+            color: #333;
+        }
+
+        a {
+            text-decoration: none;
+            color: #007bff;
+            margin: 10px 0;
+            display: inline-block;
+        }
+
+        h1, h2 {
+            color: #444;
+        }
+
+        /* 卡片式布局 */
+        .container {
+            width: 90%;
+            max-width: 1000px;
+            margin: 30px auto;
+            background: rgba(255, 255, 255, 0.8); /* 半透明背景 */
+            backdrop-filter: blur(10px); /* 模糊背景效果 */
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            display: flex; /* 左右布局 */
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        .container:hover {
+            transform: translateY(-5px); /* 悬停浮动 */
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        /* 左侧图片区域 */
+        .product-image {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .product-image img {
+            max-width: 100%;
+            max-height: 400px; /* 限制最大高度 */
+            border-radius: 12px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .product-image img:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        /* 右侧内容区域 */
+        .product-details {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .product-details p {
+            margin: 10px 0;
+            font-size: 16px;
+            color: #555;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.3s ease;
+        }
+
+        button:hover {
+            transform: scale(1.1);
+            opacity: 0.9;
+        }
+
+        button:first-child {
+            background: linear-gradient(135deg, #4CAF50, #81C784); /* 绿色渐变 */
+            color: #fff;
+        }
+
+        button:last-child {
+            background: linear-gradient(135deg, #FFCA28, #FFC107); /* 黄色渐变 */
+            color: #fff;
+        }
+
+     /* 评论区容器 */
+    .comments-section {
+        margin-top: 30px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px; /* 评论卡片之间的间距 */
+    }
+
+    /* 评论卡片 */
+    .comment {
+        padding: 20px;
+        background: rgba(240, 248, 255, 0.9); /* 蓝色背景 */
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        text-align: center; /* 内容居中 */
+        width: 95%; /* 卡片宽度占满容器 */
+    }
+
+    /* 评论头部 */
+    .comment-header {
+        display: flex;
+        justify-content: center; /* 居中对齐 */
+        gap: 10px; /* 用户名和时间的间距 */
+        font-size: 16px;
+        color: #333;
+        margin-bottom: 10px;
+    }
+
+    .comment-header strong {
+        color: #007bff;
+    }
+
+    .comment-header .timestamp {
+        font-size: 14px;
+        color: #888;
+    }
+     /* 平均评分 */
+    .average-rating {
+        font-size: 18px;
+        color: #f39c12; /* 金色 */
+        font-weight: bold;
+    }
+    /* 评论内容 */
+    .comment-content p {
+        font-size: 18px;
+        color: #555;
+        margin: 10px 0;
+    }
+
+    /* 商家回复 */
+    .reply {
+        margin-top: 10px;
+        padding-left: 0; /* 回复居中时移除左边距 */
+        border-left: none; /* 移除左侧线条 */
+        font-size: 16px;
+        color: #444;
+    }
+
+    .reply strong {
+        color: #333;
+    }
+
+    /* 响应式优化 */
+    @media (max-width: 768px) {
+        .comment {
+            padding: 10px;
+        }
+
+        .comment-header strong,
+        .comment-header .timestamp {
+            font-size: 14px;
+        }
+
+        .comment-content p {
+            font-size: 14px;
+        }
+    }
+    </style>
+
+    <div class="container">
+        <!-- 左侧图片 -->
+        <div class="product-image">
+            <img src="{{ product.image_url }}" alt="{{ product.name }}">
+        </div>
+
+        <!-- 右侧详情 -->
+        <div class="product-details">
+            <div>
+                <h1>{{ product.name }}</h1>
+                <p><strong>单价:</strong> ￥{{ product.price }}</p>
+                <p><strong>库存:</strong> {{ product.stock }}</p>
+                <p><strong>销量:</strong> {{ product.sales_volume }}</p>
+                <p><strong>描述:</strong> {{ product.description }}</p>
+                <p><strong>点击量:</strong> {{ product.clicks }}</p>
+            </div>
+
+            <!-- 按钮组 -->
+            <div class="button-group">
+                <button onclick="openCartModal({{ product.product_id }})">加入购物车</button>
+                <button onclick="openBuyNowModal({{ product.product_id }})">立即购买</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 评论区 -->
+   <div class="container comments-section">
+    <h2>用户评论
+        {% if average_rating != "暂无评分" %}
+            <span class="average-rating"> (平均评分: {{ average_rating }} / 5)</span>
+        {% else %}
+            <span class="average-rating"> ({{ average_rating }})</span>
+        {% endif %}
+    </h2>
+    {% if comments %}
+        {% for comment in comments %}
+            <div class="comment">
+                <div class="comment-header">
+                    <strong>{{ comment.user_id }}</strong>
+                    <span class="timestamp">{{ comment.timestamp }}</span>
+                </div>
+                <div class="comment-content">
+                    <p>{{ comment.content }}</p>
+                </div>
+                {% if comment.reply %}
+                    <div class="reply">
+                        <p><strong>商家回复</strong>: {{ comment.reply }}</p>
+                    </div>
+                {% endif %}
+            </div>
+        {% endfor %}
+    {% else %}
+        <p>暂无评论</p>
+    {% endif %}
+</div>
+
+    <script>
+        function openCartModal(productId) {
+            alert("功能未实现");
+        }
+
+        function openBuyNowModal(productId) {
+            alert("功能未实现");
+        }
+    </script>
+{% endblock %}
