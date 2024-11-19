@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}页面标题{% endblock %}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        nav {
+            background-color: #333;
+            color: white;
+            padding: 10px;
+            text-align: center;
+        }
+        nav a {
+            color: white;
+            margin: 0 15px;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .content {
+            padding: 20px;
+            background-color: #fff;
+        }
+        .message {
+            margin: 20px auto;
+            padding: 10px;
+            width: 80%;
+            max-width: 800px;
+            border-radius: 5px;
+            text-align: center;
+            font-weight: bold;
+            display: none;
+        }
+        .message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="{% url 'consumer_home' %}">首页</a>
+        <a href="{% url 'cart_view' %}">购物车</a>
+        <a href="{% url 'order_view' %}">我的订单</a>
+        {% if request.session.user_id %}
+            <a href="{% url 'user_profile' %}">用户ID: {{ request.session.user_id }}</a>
+        {% else %}
+            <a href="{% url 'login' %}">请登录</a>
+        {% endif %}
+    </nav>
+
+    <!-- 全局消息框 -->
+    <div id="global-message" class="message"></div>
+
+    <!-- 页面消息框 -->
+    <div id="message-box" class="message {% if messages %}{% for message in messages %}{{ message.tags }}{% endfor %}{% endif %}" style="display: {% if messages %}block{% else %}none{% endif %};">
+        {% if messages %}
+            {% for message in messages %}
+                {{ message }}
+            {% endfor %}
+        {% endif %}
+    </div>
+
+    <div class="content">
+        {% block content %}{% endblock %}
+    </div>
+
+    <script defer>
+        window.onload = function() {
+            const messageBox = document.getElementById("message-box");
+            if (messageBox && messageBox.innerText.trim() !== "") {
+                setTimeout(() => {
+                    messageBox.style.display = "none";
+                }, 3000);
+            }
+        };
+
+        // 显示全局消息
+        function showMessage(message, success = true) {
+            const globalMessage = document.getElementById("global-message");
+            globalMessage.innerText = message;
+            globalMessage.classList.toggle("success", success);
+            globalMessage.classList.toggle("error", !success);
+            globalMessage.style.display = "block";
+            setTimeout(() => {
+                globalMessage.style.display = "none";
+            }, 3000);
+        }
+    </script>
+
+    <!-- 页面自定义脚本 -->
+    {% block scripts %}{% endblock %}
+</body>
+</html>
