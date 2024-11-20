@@ -1,0 +1,97 @@
+{% extends "admin_base.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">日志管理</div>
+    <div class="search-bar">
+        <form method="GET">
+            <input type="text" name="query" placeholder="搜索事件类型" value="{{ query }}">
+            <input type="text" name="user_id" placeholder="用户ID" value="{{ user_id }}">
+            <input type="date" name="start_date" value="{{ start_date }}">
+            <input type="date" name="end_date" value="{{ end_date }}">
+            <button type="submit">筛选</button>
+        </form>
+    </div>
+    <table class="log-table">
+        <thead>
+            <tr>
+                <th>时间</th>
+                <th>事件类型</th>
+                <th>用户ID</th>
+                <th>事件详情</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+                <tr>
+                    <td>{{ log.timestamp|date:"Y-m-d H:i:s" }}</td>
+                    <td>{{ log.event_type }}</td>
+                    <td>{{ log.user_id }}</td>
+                    <td>{{ log.details }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+<style>
+    .card {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+    }
+    .card-header {
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 15px;
+    }
+    .search-bar {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+    .search-bar input {
+        padding: 8px;
+        font-size: 14px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+    .search-bar button {
+        padding: 8px 16px;
+        font-size: 14px;
+        background-color: #007BFF;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+    .search-bar button:hover {
+        background-color: #0056b3;
+    }
+    .log-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+    }
+    .log-table th, .log-table td {
+        text-align: left;
+        padding: 10px;
+        border-bottom: 1px solid #ddd;
+    }
+    .log-table th {
+        background-color: #f8f9fa;
+        font-weight: bold;
+    }
+    .log-table tbody tr:hover {
+        background-color: #f1f1f1;
+    }
+    .log-table td {
+        word-wrap: break-word;
+        max-width: 200px;
+    }
+</style>
