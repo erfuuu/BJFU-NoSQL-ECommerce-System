@@ -1,0 +1,91 @@
+{% extends "admin_base.html" %}
+{% block content %}
+<div class="card">
+    <div class="card-header">用户管理</div>
+    <div class="search-bar">
+        <form method="GET">
+            <input type="text" name="user_id" placeholder="搜索用户ID" value="{{ query }}">
+            <button type="submit">搜索</button>
+        </form>
+    </div>
+    <table class="user-table">
+        <thead>
+            <tr>
+                <th>用户ID</th>
+                <th>姓名</th>
+                <th>地址</th>
+                <th>电话</th>
+                <th>类型</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td>{{ user.user_id }}</td>
+                <td>{{ user.name }}</td>
+                <td>{{ user.address }}</td>
+                <td>{{ user.phone }}</td>
+                <td>{{ user.type }}</td>
+                <td>
+                    {% if user.type != 'manager' %}
+                    <button class="btn-delete" onclick="deleteUser('{{ user.user_id }}')">删除</button>
+                    {% else %}
+                    <span style="color: #888;">不可删除</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- 分页导航 -->
+    <div class="pagination">
+        {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}&user_id={{ query }}">上一页</a>
+        {% endif %}
+        {% for num in page_obj.paginator.page_range %}
+            {% if num == page_obj.number %}
+                <strong>{{ num }}</strong>
+            {% else %}
+                <a href="?page={{ num }}&user_id={{ query }}">{{ num }}</a>
+            {% endif %}
+        {% endfor %}
+        {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}&user_id={{ query }}">下一页</a>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    function deleteUser(userId) {
+    if (!confirm('确认删除该用户吗？')) return;
+
+    fetch(`/manager/delete_user/${userId}/`, {
+        method: 'DELETE',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => {
+        if (response.headers.get('Content-Type')?.includes('application/json')) {
+            return response.json();
+        } else {
+            throw new Error('服务器返回非 JSON 数据');
+        }
+    })
+    .then(data => {
+        alert(data.message);
+        if (data.success) {
+            location.reload(); // 删除成功后刷新页面
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('删除失败，请稍后再试。');
+    });
+}
+
+</script>
+{% endblock %}
