@@ -99,7 +99,11 @@
     <div class="container">
         <a href="{% url 'business_home' %}">返回</a>
         <h1>{{ product.name }}</h1>
-        <img src="{{ product.image_url }}" alt="{{ product.name }}">
+        {% if product.image_data %}
+            <img src="/business/product_image/{{ product.product_id }}/" alt="{{ product.name }}">
+        {% else %}
+            <img src="{{ product.image_url }}" alt="{{ product.name }}">
+        {% endif %}
         <p><strong>单价:</strong> ￥{{ product.price }}</p>
         <p><strong>库存:</strong> {{ product.stock }}</p>
         <p><strong>销量:</strong> {{ product.sales_volume }}</p>

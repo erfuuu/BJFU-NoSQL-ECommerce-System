@@ -44,6 +44,29 @@
     button:hover {
         background-color: #2980b9;
     }
+    .btn-success {
+        background-color: #2ecc71;
+    }
+    .btn-success:hover {
+        background-color: #27ae60;
+    }
+    .btn-danger {
+        background-color: #e74c3c;
+    }
+    .btn-danger:hover {
+        background-color: #c0392b;
+    }
+    .btn-warning {
+        background-color: #f39c12;
+    }
+    .btn-warning:hover {
+        background-color: #e67e22;
+    }
+    .action-buttons {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
 </style>
 
 <div class="order-list">
@@ -62,18 +85,53 @@
         <p><span>联系方式:</span> {{ order.order_phone }}</p>
         <p><span>订单状态:</span> {{ order.status }}</p>
 
-        {% if order.status == "Pending" %}
-        <form action="{% url 'ship_order' order.order_id %}" method="post">
-            {% csrf_token %}
-            <button type="submit">发货</button>
-        </form>
-        {% elif order.status == "Shipped" %}
-        <p><strong>订单已发货</strong></p>
-        {% elif order.status == "Delivered" %}
-        <p><strong>订单已送到</strong></p>
-        {% elif order.status == "Completed" %}
-        <p><strong>订单已完成</strong></p>
+        <!-- 退款/退货原因显示 -->
+        {% if order.status == "Refund Pending" %}
+        <p><strong>退款原因:</strong> {{ order.refund_reason }}</p>
         {% endif %}
+        {% if order.status == "Return Pending" %}
+        <p><strong>退货原因:</strong> {{ order.return_reason }}</p>
+        {% endif %}
+
+        <!-- 操作按钮 -->
+        <div class="action-buttons">
+            {% if order.status == "Pending" %}
+            <form action="{% url 'ship_order' order.order_id %}" method="post">
+                {% csrf_token %}
+                <button type="submit">发货</button>
+            </form>
+            {% elif order.status == "Shipped" %}
+            <p><strong>订单已发货</strong></p>
+            {% elif order.status == "Delivered" %}
+            <p><strong>订单已送到</strong></p>
+            {% elif order.status == "Completed" %}
+            <p><strong>订单已完成</strong></p>
+            {% elif order.status == "Refund Pending" %}
+            <form action="{% url 'approve_refund' order.order_id %}" method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn-success">批准退款</button>
+            </form>
+            <form action="{% url 'reject_refund' order.order_id %}" method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn-danger">拒绝退款</button>
+            </form>
+            {% elif order.status == "Return Pending" %}
+            <form action="{% url 'approve_return' order.order_id %}" method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn-success">批准退货</button>
+            </form>
+            <form action="{% url 'reject_return' order.order_id %}" method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn-danger">拒绝退货</button>
+            </form>
+            {% elif order.status == "Refunded" %}
+            <p><strong>订单已退款</strong></p>
+            <p><strong>退款时间:</strong> {{ order.refund_timestamp|date:"Y-m-d H:i" }}</p>
+            {% elif order.status == "Returned" %}
+            <p><strong>订单已退货</strong></p>
+            <p><strong>退货时间:</strong> {{ order.return_timestamp|date:"Y-m-d H:i" }}</p>
+            {% endif %}
+        </div>
     </div>
     {% endfor %}
 </div>

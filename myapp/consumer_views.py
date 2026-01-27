@@ -17,7 +17,11 @@ from .views import login_required, create_log
 @login_required
 def consumer_home_view(request):
     query = request.GET.get('query', '').strip()  # 获取搜索关键字
-    products = Product.objects.all().order_by('-sales_volume')  # 默认按销量降序排列
+    sort_by = request.GET.get('sort_by', 'sales_volume')  # 排序字段：sales_volume, price
+    sort_order = request.GET.get('sort_order', 'desc')  # 排序顺序：asc, desc
+    category = request.GET.get('category', '')  # 分类筛选
+    
+    products = Product.objects.all()
 
     # 搜索功能
     if query:
@@ -33,12 +37,36 @@ def consumer_home_view(request):
                 Q(tags__icontains=query)
             )
 
+    # 分类筛选
+    if category:
+        products = products.filter(tags__icontains=category)
+
+    # 排序功能
+    sort_prefix = '-' if sort_order == 'desc' else ''
+    if sort_by == 'sales_volume':
+        products = products.order_by(f'{sort_prefix}sales_volume')
+    elif sort_by == 'price':
+        products = products.order_by(f'{sort_prefix}price')
+
     # 分页功能
     paginator = Paginator(products, 10)  # 每页显示10个商品
     page_number = request.GET.get('page')
     products_page = paginator.get_page(page_number)
 
-    return render(request, 'consumer_home.html', {'products': products_page, 'query': query})
+    # 获取所有分类（从tags中提取）
+    all_tags = set()
+    for product in Product.objects.all():
+        all_tags.update(product.tags)
+    all_tags = sorted(list(all_tags))
+
+    return render(request, 'consumer_home.html', {
+        'products': products_page,
+        'query': query,
+        'sort_by': sort_by,
+        'sort_order': sort_order,
+        'category': category,
+        'all_tags': all_tags
+    })
 
 
 def search_products(request):
@@ -91,12 +119,16 @@ def product_detail_view(request, product_id):
     else:
         average_rating = "暂无评分"  # 无评分时的默认显示
 
+    # 判断图片显示方式
+    has_image_data = bool(product.image_data)
+
     # 上下文
     context = {
         'product': product,
         'comments': comments,
         'average_rating': average_rating,  # 添加平均评分
-        'user_is_authenticated': request.user.is_authenticated
+        'user_is_authenticated': request.user.is_authenticated,
+        'has_image_data': has_image_data
     }
 
     # 记录商品浏览事件
@@ -264,8 +296,8 @@ def order_view(request):
     start_date = request.GET.get('start_date')  # 格式: YYYY-MM-DD
     end_date = request.GET.get('end_date')  # 格式: YYYY-MM-DD
 
-    # 初始化订单查询集
-    orders = Order.objects.filter(user_id=user_id, status__in=["Pending", "Shipped", "Delivered", "Completed"]).order_by('-timestamp')
+    # 初始化订单查询集，包含所有订单状态
+    orders = Order.objects.filter(user_id=user_id).order_by('-timestamp')
 
     # 按时间范围过滤
     if start_date:
@@ -321,6 +353,58 @@ def add_comment_for_order(request, order_id, product_id):
                 return JsonResponse({"success": False, "message": "订单状态不允许评论"})
         return JsonResponse({"success": False, "message": "订单未找到或无法评论"})
     return JsonResponse({"success": False, "message": "无效请求"})
+
+# 申请退款视图（发货前）
+@login_required
+def request_refund(request, order_id):
+    if request.method == "POST":
+        try:
+            user_id = request.session.get('user_id')
+            order = Order.objects.get(order_id=order_id, user_id=user_id)
+            
+            # 只有在Pending状态下才能申请退款
+            if order.status == "Pending":
+                data = json.loads(request.body)
+                reason = data.get("reason", "")
+                
+                order.status = "Refund Pending"
+                order.refund_reason = reason
+                
+                order.save()
+                return JsonResponse({"success": True, "message": "退款申请已提交，等待商家审批"})
+            else:
+                return JsonResponse({"success": False, "message": "当前状态不允许申请退款"})
+        except Order.DoesNotExist:
+            return JsonResponse({"success": False, "message": "订单未找到"}, status=404)
+        except Exception as e:
+            return JsonResponse({"success": False, "message": str(e)}, status=500)
+    return JsonResponse({"success": False, "message": "无效请求"}, status=400)
+
+# 申请退货视图（到货后）
+@login_required
+def request_return(request, order_id):
+    if request.method == "POST":
+        try:
+            user_id = request.session.get('user_id')
+            order = Order.objects.get(order_id=order_id, user_id=user_id)
+            
+            # 只有在Delivered状态下才能申请退货
+            if order.status == "Delivered":
+                data = json.loads(request.body)
+                reason = data.get("reason", "")
+                
+                order.status = "Return Pending"
+                order.return_reason = reason
+                
+                order.save()
+                return JsonResponse({"success": True, "message": "退货申请已提交，等待商家审批"})
+            else:
+                return JsonResponse({"success": False, "message": "当前状态不允许申请退货"})
+        except Order.DoesNotExist:
+            return JsonResponse({"success": False, "message": "订单未找到"}, status=404)
+        except Exception as e:
+            return JsonResponse({"success": False, "message": str(e)}, status=500)
+    return JsonResponse({"success": False, "message": "无效请求"}, status=400)
 
 #个人信息视图
 @login_required

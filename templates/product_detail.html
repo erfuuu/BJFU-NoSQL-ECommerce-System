@@ -97,7 +97,11 @@
     <div class="container">
         <div class="product-details">
             <div class="product-image">
-                <img src="{{ product.image_url }}" alt="{{ product.name }}">
+                {% if has_image_data %}
+                    <img src="/business/product_image/{{ product.product_id }}/" alt="{{ product.name }}">
+                {% else %}
+                    <img src="{{ product.image_url }}" alt="{{ product.name }}">
+                {% endif %}
             </div>
             <div class="product-info">
                 <h1>{{ product.name }}</h1>

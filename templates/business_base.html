@@ -64,6 +64,7 @@
         <a href="{% url 'update_product' %}">修改商品</a>
         <a href="{% url 'delete_product' %}">删除商品</a>
         <a href="{% url 'orders' %}">所有订单</a>
+        <a href="{% url 'analytics_dashboard' %}">数据分析</a>
     </div>
     <div class="user-info">
         {% if request.session.user_id %}

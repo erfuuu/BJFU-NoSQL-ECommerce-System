@@ -101,7 +101,7 @@
     </div>
 
     <!-- 商品编辑表单 -->
-    <form method="POST" id="product-form" class="product-form">
+    <form method="POST" id="product-form" class="product-form" enctype="multipart/form-data">
         {% csrf_token %}
         <input type="hidden" name="product_id" id="product_id">
 
@@ -117,8 +117,11 @@
         <label for="stock">库存:</label>
         <input type="text" name="stock" id="stock" required>
 
+        <label for="image_file">上传新图片:</label>
+        <input type="file" name="image_file" id="image_file" accept="image/*">
+
         <label for="image_url">图片 URL:</label>
-        <input type="text" name="image_url" id="image_url">
+        <input type="text" name="image_url" id="image_url" placeholder="如果不上传图片，请输入URL">
 
         <label for="tags">标签 (用逗号分隔):</label>
         <input type="text" name="tags" id="tags">
@@ -151,7 +154,7 @@
                 form.querySelector('#description').value = data.data.description;
                 form.querySelector('#price').value = data.data.price;
                 form.querySelector('#stock').value = data.data.stock;
-                form.querySelector('#image_url').value = data.data.image_url;
+                form.querySelector('#image_url').value = data.data.image_url || '';
                 form.querySelector('#tags').value = data.data.tags;
 
                 form.classList.add('active'); // 显示表单

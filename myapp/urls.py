@@ -24,6 +24,8 @@ urlpatterns = [
     path('order/confirm_receipt/<str:order_id>/', consumer_views.confirm_receipt, name='confirm_receipt'),
     path('order/add_comment_for_order/<str:order_id>/<int:product_id>/', consumer_views.add_comment_for_order,
          name='add_comment_for_order'),
+    path('order/request_refund/<str:order_id>/', consumer_views.request_refund, name='request_refund'),
+    path('order/request_return/<str:order_id>/', consumer_views.request_return, name='request_return'),
 
     # 商家视图
     path('business/home/', business_views.business_home, name='business_home'),
@@ -33,8 +35,14 @@ urlpatterns = [
     path('business/delete/', business_views.delete_product, name='delete_product'),
     path('business/delete/<str:product_id>/', business_views.delete_single_product, name='delete_single_product'),
     path('business/profile/', business_views.business_profile, name='business_profile'),
+    path('business/product_image/<int:product_id>/', business_views.product_image_view, name='product_image_view'),
+    path('business/analytics/', business_views.analytics_dashboard, name='analytics_dashboard'),
     path('orders/', business_views.orders, name='orders'),
     path('ship_order/<str:order_id>/', business_views.ship_order, name='ship_order'),
+    path('approve_refund/<str:order_id>/', business_views.approve_refund, name='approve_refund'),
+    path('reject_refund/<str:order_id>/', business_views.reject_refund, name='reject_refund'),
+    path('approve_return/<str:order_id>/', business_views.approve_return, name='approve_return'),
+    path('reject_return/<str:order_id>/', business_views.reject_return, name='reject_return'),
 
     #管理员视图
     path('manager/logs/', manager_views.logs_view, name='logs_view'),

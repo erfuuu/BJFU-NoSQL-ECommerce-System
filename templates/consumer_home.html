@@ -3,11 +3,47 @@
 {% block title %}消费者页面{% endblock %}
 
 {% block content %}
-    <!-- 搜索框 -->
+    <!-- 搜索框和筛选器 -->
     <div class="search-bar">
-        <form method="get" action="{% url 'search_products' %}" class="search-form">
+        <form method="get" action="{% url 'consumer_home' %}" class="search-form">
             <input type="text" name="query" placeholder="请输入商品ID、名称或标签" value="{{ query|default:'' }}" />
             <button type="submit">搜索</button>
+        </form>
+    </div>
+
+    <!-- 筛选器 -->
+    <div class="filter-bar">
+        <form method="get" action="{% url 'consumer_home' %}" class="filter-form">
+            <input type="hidden" name="query" value="{{ query|default:'' }}">
+            
+            <div class="filter-group">
+                <label for="category">分类:</label>
+                <select name="category" id="category">
+                    <option value="">全部</option>
+                    {% for tag in all_tags %}
+                        <option value="{{ tag }}" {% if category == tag %}selected{% endif %}>{{ tag }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="sort_by">排序方式:</label>
+                <select name="sort_by" id="sort_by">
+                    <option value="sales_volume" {% if sort_by == 'sales_volume' %}selected{% endif %}>销量</option>
+                    <option value="price" {% if sort_by == 'price' %}selected{% endif %}>售价</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="sort_order">排序顺序:</label>
+                <select name="sort_order" id="sort_order">
+                    <option value="desc" {% if sort_order == 'desc' %}selected{% endif %}>从高到低</option>
+                    <option value="asc" {% if sort_order == 'asc' %}selected{% endif %}>从低到高</option>
+                </select>
+            </div>
+
+            <button type="submit">应用筛选</button>
+            <a href="{% url 'consumer_home' %}" class="reset-btn">重置</a>
         </form>
     </div>
 
@@ -17,7 +53,11 @@
             {% for product in products %}
                 <div class="product">
                     <a href="{% url 'product_detail' product.product_id %}">
-                        <img src="{{ product.image_url }}" alt="{{ product.name }}"/>
+                        {% if product.image_data %}
+                            <img src="/business/product_image/{{ product.product_id }}/" alt="{{ product.name }}"/>
+                        {% else %}
+                            <img src="{{ product.image_url }}" alt="{{ product.name }}"/>
+                        {% endif %}
                         <h3>{{ product.name }}</h3>
                     </a>
                     <p>{{ product.description }}</p>
@@ -35,17 +75,17 @@
     <div class="pagination">
         <ul>
             {% if products.has_previous %}
-                <li><a href="?page={{ products.previous_page_number }}{% if query %}&query={{ query }}{% endif %}">&laquo; 上一页</a></li>
+                <li><a href="?page={{ products.previous_page_number }}&query={{ query }}&category={{ category }}&sort_by={{ sort_by }}&sort_order={{ sort_order }}">&laquo; 上一页</a></li>
             {% endif %}
             {% for num in products.paginator.page_range %}
                 {% if products.number == num %}
                     <li class="active">{{ num }}</li>
                 {% else %}
-                    <li><a href="?page={{ num }}{% if query %}&query={{ query }}{% endif %}">{{ num }}</a></li>
+                    <li><a href="?page={{ num }}&query={{ query }}&category={{ category }}&sort_by={{ sort_by }}&sort_order={{ sort_order }}">{{ num }}</a></li>
                 {% endif %}
             {% endfor %}
             {% if products.has_next %}
-                <li><a href="?page={{ products.next_page_number }}{% if query %}&query={{ query }}{% endif %}">下一页 &raquo;</a></li>
+                <li><a href="?page={{ products.next_page_number }}&query={{ query }}&category={{ category }}&sort_by={{ sort_by }}&sort_order={{ sort_order }}">下一页 &raquo;</a></li>
             {% endif %}
         </ul>
     </div>
@@ -77,6 +117,61 @@
         }
         .search-bar button:hover {
             background-color: #6CA6CD;
+        }
+
+        /* 筛选器样式 */
+        .filter-bar {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        .filter-form {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .filter-group label {
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .filter-group select {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .filter-form button {
+            padding: 8px 16px;
+            font-size: 14px;
+            background-color: #6CA6CD;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        .filter-form button:hover {
+            background-color: #5a8fb8;
+        }
+        .reset-btn {
+            padding: 8px 16px;
+            font-size: 14px;
+            background-color: #95a5a6;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background-color 0.3s ease;
+        }
+        .reset-btn:hover {
+            background-color: #7f8c8d;
         }
 
         /* 商品网格样式 */
