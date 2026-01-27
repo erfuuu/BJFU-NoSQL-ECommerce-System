@@ -89,18 +89,16 @@ def register_view(request):
 # 自定义登录验证装饰器
 def login_required(view_func):
     def _wrapped_view(request, *args, **kwargs):
-        # 尝试从会话中获取用户 ID
-        session_key = request.COOKIES.get('sessionid')
-        if session_key:
+        # 直接从request.session中获取用户ID
+        user_id = request.session.get('user_id')
+        if user_id:
             try:
-                session = Session.objects.get(session_key=session_key)
-                session_data = session.get_decoded()
-                user_id = session_data.get('user_id')
                 # 验证用户是否存在
                 UserProfile.objects.get(user_id=user_id)
                 return view_func(request, *args, **kwargs)
-            except (Session.DoesNotExist, DoesNotExist):
-                pass
+            except DoesNotExist:
+                # 用户不存在，清除会话并重定向到登录页面
+                request.session.flush()
         # 如果用户未登录，重定向到登录页面
         return redirect('login')
     return _wrapped_view
