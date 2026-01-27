@@ -115,8 +115,12 @@ def clicks_view(request):
     if not user or user.type != 'manager':
         return redirect('login')
 
-    # 获取查询参数并筛选产品
+    # 获取查询参数
     query = request.GET.get('product_id', '')
+    start_date = request.GET.get('start_date')  # 开始日期
+    end_date = request.GET.get('end_date')  # 结束日期
+
+    # 获取所有产品
     if query:
         products = Product.objects.filter(product_id=int(query))
     else:
@@ -135,8 +139,67 @@ def clicks_view(request):
         for product in products
     ]
 
+    # 分析系统繁忙时段
+    from collections import defaultdict
+    from datetime import timedelta
+
+    # 获取所有日志
+    logs = Log.objects.all()
+
+    # 按时间段筛选
+    if start_date:
+        try:
+            start_date_obj = datetime.strptime(start_date, "%Y-%m-%d")
+            logs = logs.filter(timestamp__gte=start_date_obj)
+        except ValueError:
+            pass
+    if end_date:
+        try:
+            end_date_obj = datetime.strptime(end_date, "%Y-%m-%d")
+            # 将结束日期设置为当天的23:59:59
+            end_date_obj = end_date_obj.replace(hour=23, minute=59, second=59)
+            logs = logs.filter(timestamp__lte=end_date_obj)
+        except ValueError:
+            pass
+
+    # 分析点击量的小时分布
+    hourly_clicks = defaultdict(int)
+    for log in logs:
+        if log.event_type == "view_product":
+            hour = log.timestamp.hour
+            hourly_clicks[hour] += 1
+
+    # 找出最繁忙的时段（按小时）
+    peak_hours = sorted(hourly_clicks.items(), key=lambda x: x[1], reverse=True)[:5]
+
+    # 分析每日点击量趋势
+    daily_clicks = defaultdict(int)
+    for log in logs:
+        if log.event_type == "view_product":
+            date_str = log.timestamp.strftime('%Y-%m-%d')
+            daily_clicks[date_str] += 1
+
+    # 按日期排序
+    daily_clicks = dict(sorted(daily_clicks.items(), reverse=True))
+
+    # 计算每日点击量的最大值（用于图表比例）
+    max_daily_clicks = max(daily_clicks.values()) if daily_clicks else 0
+
+    # 计算总点击量
+    total_clicks = sum(product.clicks for product in products)
+
     # 渲染模板
-    return render(request, 'admin_clicks.html', {'products': products_list, 'query': query})
+    return render(request, 'admin_clicks.html', {
+        'products': products_list,
+        'query': query,
+        'start_date': start_date,
+        'end_date': end_date,
+        'hourly_clicks': dict(hourly_clicks),
+        'peak_hours': peak_hours,
+        'daily_clicks': daily_clicks,
+        'max_daily_clicks': max_daily_clicks,
+        'total_clicks': total_clicks
+    })
 
 
 @login_required

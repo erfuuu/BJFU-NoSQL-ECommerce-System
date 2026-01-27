@@ -38,9 +38,42 @@
             <p><strong>电话:</strong> {{ order.order_phone }}</p>
             <p><strong>状态:</strong> <span class="order-status">{{ order.status }}</span></p>
 
+            <!-- 退款/退货申请状态显示 -->
+            {% if order.status == "Refund Pending" %}
+            <p><strong>退款原因:</strong> {{ order.refund_reason }}</p>
+            <p style="color: #f39c12;"><strong>等待商家审批退款申请...</strong></p>
+            {% endif %}
+
+            {% if order.status == "Return Pending" %}
+            <p><strong>退货原因:</strong> {{ order.return_reason }}</p>
+            <p style="color: #f39c12;"><strong>等待商家审批退货申请...</strong></p>
+            {% endif %}
+
+            <!-- 退款按钮（Pending状态） -->
+            {% if order.status == "Pending" %}
+            <button onclick="requestRefund('{{ order.order_id }}')" class="btn-warning">申请退款</button>
+            {% endif %}
+
+            <!-- 退货按钮（Delivered状态） -->
+            {% if order.status == "Delivered" %}
+            <button onclick="requestReturn('{{ order.order_id }}')" class="btn-warning">申请退货</button>
+            <button onclick="confirmReceipt('{{ order.order_id }}')" class="btn-primary">确认收货</button>
+            {% endif %}
+
             <!-- 确认收货按钮 -->
             {% if order.status == "Delivered" %}
-            <button onclick="confirmReceipt('{{ order.order_id }}')" class="btn-primary">确认收货</button>
+
+            {% endif %}
+
+            <!-- 显示退款/退货原因 -->
+            {% if order.status == "Refunded" %}
+            <p><strong>退款原因:</strong> {{ order.refund_reason }}</p>
+            <p><strong>退款时间:</strong> {{ order.refund_timestamp|date:"Y-m-d H:i" }}</p>
+            {% endif %}
+
+            {% if order.status == "Returned" %}
+            <p><strong>退货原因:</strong> {{ order.return_reason }}</p>
+            <p><strong>退货时间:</strong> {{ order.return_timestamp|date:"Y-m-d H:i" }}</p>
             {% endif %}
 
             <!-- 评论功能 -->
@@ -90,6 +123,60 @@
             })
             .catch(error => {
                 console.error("确认收货请求失败:", error);
+                alert("请求失败，请稍后重试！");
+            });
+    }
+
+    function requestRefund(orderId) {
+        const reason = prompt("请输入退款原因：");
+        if (reason === null) return; // 用户取消
+        
+        fetch(`/order/request_refund/${orderId}/`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": getCsrfToken(),
+            },
+            body: JSON.stringify({ reason }),
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert(`退款失败: ${data.message}`);
+                }
+            })
+            .catch(error => {
+                console.error("退款请求失败:", error);
+                alert("请求失败，请稍后重试！");
+            });
+    }
+
+    function requestReturn(orderId) {
+        const reason = prompt("请输入退货原因：");
+        if (reason === null) return; // 用户取消
+        
+        fetch(`/order/request_return/${orderId}/`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": getCsrfToken(),
+            },
+            body: JSON.stringify({ reason }),
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert(`退货失败: ${data.message}`);
+                }
+            })
+            .catch(error => {
+                console.error("退货请求失败:", error);
                 alert("请求失败，请稍后重试！");
             });
     }
@@ -228,6 +315,22 @@ h1 {
 
 .btn-primary:hover {
     background-color: #27ae60;
+}
+
+.btn-warning {
+    padding: 10px 15px;
+    background-color: #f39c12;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s ease;
+    margin-right: 10px;
+}
+
+.btn-warning:hover {
+    background-color: #e67e22;
 }
 
 .btn-secondary {

@@ -30,14 +30,14 @@
     label {
         font-weight: bold;
     }
-    input[type="text"], input[type="url"], textarea {
+    input[type="text"], input[type="url"], input[type="number"], textarea {
         width: 100%;
         padding: 10px;
         border: 1px solid #ddd;
         border-radius: 5px;
         font-size: 14px;
     }
-    input[type="text"]:focus, input[type="url"]:focus, textarea:focus {
+    input[type="text"]:focus, input[type="url"]:focus, input[type="number"]:focus, textarea:focus {
         border-color: #3498db;
         outline: none;
     }
@@ -71,20 +71,33 @@
         margin-bottom: 10px;
         font-size: 14px;
     }
+    .image-section {
+        border: 1px solid #ddd;
+        padding: 15px;
+        border-radius: 5px;
+        background-color: #f9f9f9;
+    }
+    .image-option {
+        margin-bottom: 15px;
+    }
+    .image-option h4 {
+        margin-bottom: 10px;
+        color: #2c3e50;
+    }
 </style>
 
 <div class="container">
     <h2>添加商品</h2>
-    <form method="POST" action="{% url 'add_product' %}">
+    <form method="POST" action="{% url 'add_product' %}" enctype="multipart/form-data">
         {% csrf_token %}
         <label for="name">商品名称:</label>
         <input type="text" name="name" id="name" placeholder="请输入商品名称" required>
 
         <label for="price">价格:</label>
-        <input type="text" name="price" id="price" placeholder="请输入商品价格" required>
+        <input type="number" name="price" id="price" placeholder="请输入商品价格" step="0.01" required>
 
         <label for="stock">库存数量:</label>
-        <input type="text" name="stock" id="stock" placeholder="请输入库存数量" required>
+        <input type="number" name="stock" id="stock" placeholder="请输入库存数量" required>
 
         <label for="description">描述:</label>
         <textarea name="description" id="description" placeholder="请输入商品描述"></textarea>
@@ -92,8 +105,16 @@
         <label for="tags">标签 (用逗号分隔):</label>
         <input type="text" name="tags" id="tags" placeholder="例如: 电子, 家居">
 
-        <label for="image_url">商品图片 URL:</label>
-        <input type="url" name="image_url" id="image_url" placeholder="请输入商品图片的 URL">
+        <div class="image-section">
+            <div class="image-option">
+                <h4>方式一：上传图片文件</h4>
+                <input type="file" name="image_file" id="image_file" accept="image/*">
+            </div>
+            <div class="image-option">
+                <h4>方式二：输入图片 URL</h4>
+                <input type="url" name="image_url" id="image_url" placeholder="请输入商品图片的 URL">
+            </div>
+        </div>
 
         <button type="submit">提交</button>
     </form>

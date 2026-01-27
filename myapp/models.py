@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from mongoengine import Document, StringField, IntField, DecimalField, URLField, FloatField, DateTimeField, ListField, \
-    DictField, SequenceField, ValidationError
+    DictField, SequenceField, ValidationError, BinaryField
 
 
 class UserProfile(Document):
@@ -33,6 +33,8 @@ class Product(Document):
     stock = IntField()
     sales_volume = IntField()
     image_url = URLField()
+    image_data = BinaryField()  # 存储图片的二进制数据
+    image_content_type = StringField(max_length=100)  # 存储图片的MIME类型
     tags = ListField(StringField())  # 添加 tags 字段，用于存储商品标签
     clicks = IntField(default=0)  # 新增字段 clicks，用于记录产品点击量
 
@@ -100,10 +102,14 @@ class Order(Document):
     user_id = StringField(required=True, max_length=100)
     product_list = ListField(DictField())  # 示例: [{"product_id": 1, "quantity": 2}]
     total_amount = DecimalField(precision=2)
-    status = StringField(choices=["In Cart", "Pending", "Shipped", "Delivered", "Completed"], default="In Cart")
+    status = StringField(choices=["In Cart", "Pending", "Shipped", "Delivered", "Completed", "Refund Pending", "Refunded", "Return Pending", "Returned"], default="In Cart")
     timestamp = DateTimeField(default=datetime.utcnow)
     order_address = StringField(max_length=255)  # 确保字段定义无误
     order_phone = StringField(max_length=20)
+    refund_reason = StringField(max_length=500)  # 退款原因
+    return_reason = StringField(max_length=500)  # 退货原因
+    refund_timestamp = DateTimeField()  # 退款时间
+    return_timestamp = DateTimeField()  # 退货时间
 
     meta = {
         'collection': 'orders'  # 确保集合名称与 MongoDB 中的名称一致
