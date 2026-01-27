@@ -18,6 +18,11 @@ def business_home(request):
     paginator = Paginator(products, 10)  # 每页10个商品
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
+    
+    # 为每个产品添加has_image_data标志
+    for product in page_obj:
+        product.has_image_data = bool(product.image_data)
+    
     return render(request, 'business_home.html', {'products': page_obj})
 
 #产品细节页面
@@ -30,6 +35,9 @@ def business_product_detail(request, product_id):
     # 查询评论并按时间倒序排序
     comments = Comment.objects(product_id=product_id).order_by('-timestamp')
 
+    # 判断是否有上传的图片
+    has_image_data = bool(product.image_data)
+
     # 处理商家回复
     if request.method == "POST":
         comment_id = request.POST.get("comment_id")
@@ -41,7 +49,7 @@ def business_product_detail(request, product_id):
             comment.save()
             return redirect('business_product_detail', product_id=product_id)
 
-    return render(request, 'business_product_detail.html', {'product': product, 'comments': comments})
+    return render(request, 'business_product_detail.html', {'product': product, 'comments': comments, 'has_image_data': has_image_data})
 
 #添加商品
 @login_required
@@ -113,7 +121,7 @@ def update_product(request):
                     'description': product.description,
                     'price': str(product.price),
                     'stock': product.stock,
-                    'image_url': product.image_url,
+                    'image_url': product.image_url if product.image_url else '',
                     'tags': ', '.join(product.tags),
                 }
             })
@@ -135,7 +143,20 @@ def update_product(request):
                 messages.error(request, f"价格或库存输入无效：商品 {product.name}")
                 return redirect('update_product')
 
-            product.image_url = request.POST.get('image_url')
+            # 处理图片上传
+            image_file = request.FILES.get('image_file')
+            if image_file:
+                product.image_data = image_file.read()
+                product.image_content_type = image_file.content_type
+
+            # 只在有URL时才设置image_url
+            image_url = request.POST.get('image_url')
+            if image_url and image_url.strip():
+                product.image_url = image_url
+            elif not image_file:
+                # 如果没有上传新图片也没有URL，保持原样
+                pass
+
             tags = request.POST.get('tags')
             product.tags = [tag.strip() for tag in tags.split(',') if tag.strip()]
             product.save()
