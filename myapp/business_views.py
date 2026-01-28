@@ -89,7 +89,7 @@ def add_product(request):
 
 @login_required
 def update_product(request):
-    if request.method == 'GET' and request.is_ajax():
+    if request.method == 'GET' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         product_id = request.GET.get('product_id')
         product = Product.objects.filter(product_id=product_id).first()
 
@@ -181,7 +181,7 @@ def ship_order(request, order_id):
 #商家个人信息
 @login_required
 def business_profile(request):
-    user_id = request.session.get('user_id')
+    user_id = request.session.get('business_user_id')
     if not user_id:
         return redirect('login')
 

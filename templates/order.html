@@ -34,8 +34,8 @@
                 {% endfor %}
             </ul>
             <p><strong>总金额:</strong> ￥{{ order.total_amount }}</p>
-            <p><strong>地址:</strong> {{ order.order_address }}</p>
-            <p><strong>电话:</strong> {{ order.order_phone }}</p>
+            <p><strong>地址:</strong> {{ order.order_address|default:"未设置" }}</p>
+            <p><strong>电话:</strong> {{ order.order_phone|default:"未设置" }}</p>
             <p><strong>状态:</strong> <span class="order-status">{{ order.status }}</span></p>
 
             <!-- 确认收货按钮 -->

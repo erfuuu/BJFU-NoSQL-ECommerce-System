@@ -41,12 +41,18 @@ def login_view(request):
         if user:
             # 记录登录事件
             create_log(event_type="login", user_id=user.user_id, details={"status": "success"})
-            request.session['user_id'] = user.user_id
+            # 根据用户类型设置不同的session key，避免不同身份账号互相覆盖
             if user.type == 'consumer':
+                request.session['consumer_user_id'] = user.user_id
+                request.session['user_type'] = 'consumer'
                 return redirect('consumer_home')
             elif user.type == 'business':
+                request.session['business_user_id'] = user.user_id
+                request.session['user_type'] = 'business'
                 return redirect('business_home')
             elif user.type == 'manager':
+                request.session['manager_user_id'] = user.user_id
+                request.session['user_type'] = 'manager'
                 return redirect('logs_view')
         else:
             # 记录失败的登录尝试
@@ -89,18 +95,31 @@ def register_view(request):
 # 自定义登录验证装饰器
 def login_required(view_func):
     def _wrapped_view(request, *args, **kwargs):
-        # 尝试从会话中获取用户 ID
-        session_key = request.COOKIES.get('sessionid')
-        if session_key:
+        # 根据请求路径判断用户类型，使用对应的session key
+        user_id = None
+        path = request.path
+        
+        # 根据路径判断用户类型
+        if '/consumer' in path:
+            user_id = request.session.get('consumer_user_id')
+        elif '/business' in path:
+            user_id = request.session.get('business_user_id')
+        elif '/manager' in path:
+            user_id = request.session.get('manager_user_id')
+        else:
+            # 默认检查所有可能的session key
+            user_id = (request.session.get('consumer_user_id') or 
+                      request.session.get('business_user_id') or 
+                      request.session.get('manager_user_id'))
+        
+        if user_id:
             try:
-                session = Session.objects.get(session_key=session_key)
-                session_data = session.get_decoded()
-                user_id = session_data.get('user_id')
                 # 验证用户是否存在
                 UserProfile.objects.get(user_id=user_id)
                 return view_func(request, *args, **kwargs)
-            except (Session.DoesNotExist, DoesNotExist):
-                pass
+            except DoesNotExist:
+                # 用户不存在，清除会话并重定向到登录页面
+                request.session.flush()
         # 如果用户未登录，重定向到登录页面
         return redirect('login')
     return _wrapped_view

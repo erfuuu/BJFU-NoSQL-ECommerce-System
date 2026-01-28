@@ -104,6 +104,9 @@ class Order(Document):
     timestamp = DateTimeField(default=datetime.utcnow)
     order_address = StringField(max_length=255)  # 确保字段定义无误
     order_phone = StringField(max_length=20)
+    return_reason = StringField(max_length=500)  # 退货原因字段
+    refund_reason = StringField(max_length=500)  # 退款原因字段
+    refund_timestamp = DateTimeField()  # 退款时间戳
 
     meta = {
         'collection': 'orders'  # 确保集合名称与 MongoDB 中的名称一致
