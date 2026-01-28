@@ -1,25 +1,87 @@
+from datetime import datetime
+from decimal import Decimal
+
 from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.views.decorators.csrf import csrf_exempt
-import json
-
 from django.views.decorators.http import require_http_methods
 from mongoengine import Q
-from .models import Product, Comment, Order, UserProfile
-from datetime import datetime
+import json
 import uuid
-from .views import login_required, create_log
+
+from .models import Product, Comment, Order, UserProfile
+from .views import login_required, create_system_log
 
 
-# 获取商品点击量API
+PAGINATION_PAGE_SIZE = 10
+SEARCH_PAGE_SIZE = 12
+ADMIN_LOGS_PAGE_SIZE = 20
+ADMIN_COMMENTS_PAGE_SIZE = 20
+ADMIN_USERS_PAGE_SIZE = 10
+
+
+def get_consumer_user_id(request):
+    """
+    从 session 中获取消费者用户 ID
+    
+    Args:
+        request: Django HttpRequest 对象
+    
+    Returns:
+        str: 消费者用户 ID，如果未登录则返回 None
+    """
+    return request.session.get('consumer_user_id')
+
+
+def build_product_search_query(search_keyword):
+    """
+    构建商品搜索查询条件
+    
+    Args:
+        search_keyword (str): 搜索关键字
+    
+    Returns:
+        Q: MongoEngine 查询对象
+    """
+    if search_keyword.isdigit():
+        return Q(product_id=int(search_keyword)) | Q(product_name__icontains=search_keyword) | Q(product_tags__icontains=search_keyword)
+    else:
+        return Q(product_name__icontains=search_keyword) | Q(product_tags__icontains=search_keyword)
+
+
+def calculate_average_rating(comments):
+    """
+    计算评论的平均评分
+    
+    Args:
+        comments: 评论列表
+    
+    Returns:
+        float or str: 平均评分，如果没有评论则返回 "暂无评分"
+    """
+    if comments:
+        total_rating = sum(comment.comment_rating for comment in comments if comment.comment_rating)
+        return round(total_rating / len(comments), 1)
+    return "暂无评分"
+
+
 @csrf_exempt
-def get_product_clicks(request):
+def get_product_clicks_api(request):
+    """
+    获取商品点击量的 API 接口
+    
+    Args:
+        request: Django HttpRequest 对象
+    
+    Returns:
+        JsonResponse: 包含商品点击量数据的 JSON 响应
+    """
     if request.method == 'POST':
         try:
-            data = json.loads(request.body)
-            product_ids = data.get('product_ids', [])
+            request_data = json.loads(request.body)
+            product_ids = request_data.get('product_ids', [])
             
             if not product_ids:
                 return JsonResponse({'success': False, 'message': '未提供商品ID列表'})
@@ -30,251 +92,301 @@ def get_product_clicks(request):
                 if product:
                     clicks_data.append({
                         'product_id': product_id,
-                        'clicks': product.clicks
+                        'clicks': product.product_click_count
                     })
             
             return JsonResponse({'success': True, 'clicks_data': clicks_data})
-        except Exception as e:
-            return JsonResponse({'success': False, 'message': str(e)})
+        except Exception as error:
+            return JsonResponse({'success': False, 'message': str(error)})
     
     return JsonResponse({'success': False, 'message': '仅支持POST请求'})
 
 
-# 消费者主页面
 @login_required
 def consumer_home_view(request):
-    query = request.GET.get('query', '').strip()  # 获取搜索关键字
-    products = Product.objects.all().order_by('-sales_volume')  # 默认按销量降序排列
+    """
+    消费者主页视图，显示商品列表
+    
+    Args:
+        request: Django HttpRequest 对象
+    
+    Returns:
+        HttpResponse: 渲染消费者主页
+    """
+    search_keyword = request.GET.get('query', '').strip()
+    products = Product.objects.all().order_by('-product_sales_volume')
 
-    # 搜索功能
-    if query:
-        if query.isdigit():
-            products = products.filter(
-                Q(product_id=int(query)) |
-                Q(name__icontains=query) |
-                Q(tags__icontains=query)
-            )
-        else:
-            products = products.filter(
-                Q(name__icontains=query) |
-                Q(tags__icontains=query)
-            )
+    if search_keyword:
+        products = products.filter(build_product_search_query(search_keyword))
 
-    # 分页功能
-    paginator = Paginator(products, 10)  # 每页显示10个商品
+    paginator = Paginator(products, PAGINATION_PAGE_SIZE)
     page_number = request.GET.get('page')
     products_page = paginator.get_page(page_number)
 
-    return render(request, 'consumer_home.html', {'products': products_page, 'query': query})
+    return render(request, 'consumer_home.html', {'products': products_page, 'query': search_keyword})
 
 
-def search_products(request):
-    query = request.GET.get('query', '').strip()  # 获取搜索关键字
-    all_products = Product.objects.all().order_by('-sales_volume')  # 默认按销量降序排列
+@login_required
+def search_products_view(request):
+    """
+    商品搜索视图
+    
+    Args:
+        request: Django HttpRequest 对象
+    
+    Returns:
+        HttpResponse: 渲染搜索结果页面
+    """
+    search_keyword = request.GET.get('query', '').strip()
+    all_products = Product.objects.all().order_by('-product_sales_volume')
 
-    # 搜索逻辑
-    if query:
-        if query.isdigit():  # 如果查询是数字，尝试匹配商品ID
-            all_products = all_products.filter(
-                Q(product_id=int(query)) |  # 商品ID完全匹配
-                Q(name__icontains=query) |  # 商品名称模糊匹配
-                Q(tags__icontains=query)    # 标签模糊匹配
-            )
-        else:  # 非数字查询只匹配名称和标签
-            all_products = all_products.filter(
-                Q(name__icontains=query) |
-                Q(tags__icontains=query)
-            )
+    if search_keyword:
+        all_products = all_products.filter(build_product_search_query(search_keyword))
 
-    # 分页功能
-    paginator = Paginator(all_products, 12)  # 每页显示12个商品
+    paginator = Paginator(all_products, SEARCH_PAGE_SIZE)
     page_number = request.GET.get('page', 1)
     products = paginator.get_page(page_number)
 
     return render(request, 'consumer_home.html', {
         'products': products,
-        'query': query,
+        'query': search_keyword,
     })
 
-#产品细节页面
+
 @login_required
 def product_detail_view(request, product_id):
-    # 查询商品
+    """
+    商品详情页视图
+    
+    Args:
+        request: Django HttpRequest 对象
+        product_id (int): 商品 ID
+    
+    Returns:
+        HttpResponse: 渲染商品详情页
+    """
     product = Product.objects(product_id=product_id).first()
     if not product:
         return render(request, '404.html')
 
-    # 增加产品点击量
-    product.clicks += 1
+    product.product_click_count += 1
     product.save()
 
-    # 查询评论并按时间倒序排序
-    comments = Comment.objects(product_id=product_id).order_by('-likes')
+    comments = Comment.objects(product_id=product_id).order_by('-comment_like_count')
+    average_rating = calculate_average_rating(comments)
 
-    # 计算平均评分
-    if comments:
-        total_rating = sum(comment.rating for comment in comments if comment.rating)
-        average_rating = round(total_rating / len(comments), 1)
-    else:
-        average_rating = "暂无评分"  # 无评分时的默认显示
-
-    # 上下文
     context = {
         'product': product,
         'comments': comments,
-        'average_rating': average_rating,  # 添加平均评分
+        'average_rating': average_rating,
         'user_is_authenticated': request.user.is_authenticated
     }
 
-    # 记录商品浏览事件
-    create_log(event_type="view_product", user_id=request.session.get('consumer_user_id'), details={"product_id": product_id})
+    create_system_log(event_type="view_product", user_id=get_consumer_user_id(request), details={"product_id": product_id})
 
     return render(request, 'product_detail.html', context)
 
-#加入购物车
+
 @login_required
-def add_to_cart(request, product_id):
+def add_to_cart_view(request, product_id):
+    """
+    添加商品到购物车
+    
+    Args:
+        request: Django HttpRequest 对象
+        product_id (int): 商品 ID
+    
+    Returns:
+        JsonResponse: 操作结果的 JSON 响应
+    """
     if request.method == "POST":
-        # 获取 session 中的 consumer_user_id
-        user_id = request.session.get('consumer_user_id')
+        user_id = get_consumer_user_id(request)
         if not user_id:
             return JsonResponse({"success": False, "error": "用户未登录"})
 
         user_profile = UserProfile.objects(user_id=user_id).first()
         if not user_profile:
             return JsonResponse({"success": False, "error": "用户信息未找到"})
-        order_address = user_profile.get_address()
-        order_phone = user_profile.get_phone()
+        
+        delivery_address = user_profile.get_delivery_address()
+        contact_phone = user_profile.get_contact_phone()
 
-        # 获取商品数量
-        data = json.loads(request.body)
-        quantity = int(data.get("quantity", 1))
+        request_data = json.loads(request.body)
+        quantity = int(request_data.get("quantity", 1))
 
-        # 查找或创建“在购物车中”的订单
-        order = Order.objects.filter(user_id=user_id, status="In Cart").first()
-        if not order:
-            order = Order(
+        cart_order = Order.objects.filter(user_id=user_id, order_status="In Cart").first()
+        if not cart_order:
+            cart_order = Order(
                 order_id=str(uuid.uuid4()),
                 user_id=user_id,
-                product_list=[],
-                status="In Cart",
-                timestamp=datetime.utcnow(),
-                order_address = order_address,  # 赋值 order_address
-                order_phone=order_phone
+                order_items=[],
+                order_status="In Cart",
+                order_timestamp=datetime.utcnow(),
+                delivery_address=delivery_address,
+                contact_phone=contact_phone
             )
 
-        # 更新商品数量或添加新商品
         product_found = False
-        for item in order.product_list:
-            if item["product_id"] == product_id:
-                item["quantity"] += quantity
+        for order_item in cart_order.order_items:
+            if order_item["product_id"] == product_id:
+                order_item["quantity"] += quantity
                 product_found = True
                 break
         if not product_found:
-            order.product_list.append({"product_id": product_id, "quantity": quantity})
+            cart_order.order_items.append({"product_id": product_id, "quantity": quantity})
 
-        # 重新计算总金额并保存订单
-        order.calculate_total_amount()
-        order.save()
+        cart_order.calculate_order_total()
+        cart_order.save()
 
         return JsonResponse({"success": True, "message": "商品已成功加入购物车！"})
+    
     return JsonResponse({"success": False, "error": "无效请求"})
 
-#立即购买
+
 @login_required
-def buy_now(request, product_id):
+def buy_now_view(request, product_id):
+    """
+    立即购买商品
+    
+    Args:
+        request: Django HttpRequest 对象
+        product_id (int): 商品 ID
+    
+    Returns:
+        JsonResponse: 操作结果的 JSON 响应
+    """
     if request.method == "POST":
-        user_id = request.session.get('consumer_user_id')
-        data = json.loads(request.body)
-        quantity = int(data.get("quantity", 1))
+        user_id = get_consumer_user_id(request)
+        request_data = json.loads(request.body)
+        quantity = int(request_data.get("quantity", 1))
 
         user_profile = UserProfile.objects(user_id=user_id).first()
         if not user_profile:
             return JsonResponse({"success": False, "error": "用户信息未找到"})
-        order_address = user_profile.get_address()
-        order_phone = user_profile.get_phone()
+        
+        delivery_address = user_profile.get_delivery_address()
+        contact_phone = user_profile.get_contact_phone()
 
         product = Product.objects(product_id=product_id).first()
         if not product:
             return JsonResponse({"success": False, "error": "商品未找到"})
 
-        total_amount = product.price * quantity
+        total_amount = product.product_price * quantity
 
-        order = Order(
+        new_order = Order(
             order_id=str(uuid.uuid4()),
             user_id=user_id,
-            product_list=[{"product_id": product_id, "quantity": quantity}],
-            total_amount=total_amount,
-            status="Pending",
-            timestamp=datetime.utcnow(),
-            order_address = order_address,  # 赋值 order_address
-            order_phone = order_phone
+            order_items=[{"product_id": product_id, "quantity": quantity}],
+            order_total_amount=total_amount,
+            order_status="Pending",
+            order_timestamp=datetime.utcnow(),
+            delivery_address=delivery_address,
+            contact_phone=contact_phone
         )
-        order.save()
+        new_order.save()
 
-        # 更新商品库存和销量
-        product.stock -= quantity  # 减少库存
-        product.sales_volume += quantity  # 增加销量
-        product.save()  # 保存更改
+        product.product_stock -= quantity
+        product.product_sales_volume += quantity
+        product.save()
 
-        # 记录订单创建事件
-        create_log(event_type="create_order", user_id=user_id,
-                   details={"order_id": order.order_id, "total_amount": total_amount})
+        create_system_log(event_type="create_order", user_id=user_id,
+                         details={"order_id": new_order.order_id, "total_amount": total_amount})
 
         return JsonResponse({"success": True, "message": "订单已创建并等待发货！"})
+    
     return JsonResponse({"success": False, "error": "无效请求"})
-#点赞处理视图
+
+
 @csrf_exempt
 @login_required
 def like_comment_view(request, comment_id):
+    """
+    点赞评论
+    
+    Args:
+        request: Django HttpRequest 对象
+        comment_id (int): 评论 ID
+    
+    Returns:
+        JsonResponse: 操作结果的 JSON 响应
+    """
     if request.method == 'POST':
         comment = Comment.objects(comment_id=comment_id).first()
         if not comment:
             return JsonResponse({"success": False, "message": "评论不存在"})
 
-        comment.add_like()
-        return JsonResponse({"success": True, "likes": comment.likes})
+        comment.increment_like_count()
+        return JsonResponse({"success": True, "likes": comment.comment_like_count})
 
     return JsonResponse({"success": False, "message": "仅支持 POST 请求"})
-#购物车视图
+
+
 @login_required
 def cart_view(request):
-    user_id = request.session.get('consumer_user_id')
-    in_cart_orders = Order.objects(user_id=user_id, status="In Cart")
+    """
+    购物车视图
+    
+    Args:
+        request: Django HttpRequest 对象
+    
+    Returns:
+        HttpResponse: 渲染购物车页面
+    """
+    user_id = get_consumer_user_id(request)
+    in_cart_orders = Order.objects(user_id=user_id, order_status="In Cart")
     return render(request, 'cart.html', {'in_cart_orders': in_cart_orders})
 
-#购物车里下单
+
 @login_required
-def purchase_order(request, order_id):
+def purchase_order_view(request, order_id):
+    """
+    从购物车下单
+    
+    Args:
+        request: Django HttpRequest 对象
+        order_id (str): 订单 ID
+    
+    Returns:
+        JsonResponse: 操作结果的 JSON 响应
+    """
     if request.method == "POST":
-        user_id = request.session.get('consumer_user_id')
-        order = Order.objects(order_id=order_id, user_id=user_id,status="In Cart").first()
+        user_id = get_consumer_user_id(request)
+        order = Order.objects(order_id=order_id, user_id=user_id, order_status="In Cart").first()
         if order:
-            order.status = "Pending"
-            order.timestamp = datetime.utcnow()
-            for item in order.product_list:
-                product = Product.objects(product_id=item["product_id"]).first()
+            order.order_status = "Pending"
+            order.order_timestamp = datetime.utcnow()
+            for order_item in order.order_items:
+                product = Product.objects(product_id=order_item["product_id"]).first()
                 if product:
-                    if product.stock >= item["quantity"]:
-                        product.stock -= item["quantity"]
-                        product.sales_volume += item["quantity"]
+                    if product.product_stock >= order_item["quantity"]:
+                        product.product_stock -= order_item["quantity"]
+                        product.product_sales_volume += order_item["quantity"]
                         product.save()
                     else:
-                        return JsonResponse({"success": False, "error": f"商品 {product.name} 库存不足"})
+                        return JsonResponse({"success": False, "error": f"商品 {product.product_name} 库存不足"})
             order.save()
-            print({"order_id": order.order_id, "total_amount": order.total_amount})
-            create_log(event_type="create_order", user_id=user_id,
-                       details={"order_id": order.order_id, "total_amount": order.total_amount})
+            create_system_log(event_type="create_order", user_id=user_id,
+                             details={"order_id": order.order_id, "total_amount": order.order_total_amount})
             return JsonResponse({"success": True, "message": "订单已更新为待处理状态！"})
         return JsonResponse({"success": False, "error": "订单未找到或无法更新"})
     return JsonResponse({"success": False, "error": "无效请求"})
 
-#购物车里删除商品
+
 @login_required
 @require_http_methods(["DELETE"])
-def delete_order(request, order_id):
-    user_id = request.session.get('consumer_user_id')
-    order = Order.objects.filter(order_id=order_id, user_id=user_id, status="In Cart").first()
+def delete_order_view(request, order_id):
+    """
+    删除购物车中的订单
+    
+    Args:
+        request: Django HttpRequest 对象
+        order_id (str): 订单 ID
+    
+    Returns:
+        JsonResponse: 操作结果的 JSON 响应
+    """
+    user_id = get_consumer_user_id(request)
+    order = Order.objects.filter(order_id=order_id, user_id=user_id, order_status="In Cart").first()
 
     if order:
         order.delete()
@@ -282,65 +394,88 @@ def delete_order(request, order_id):
     else:
         return JsonResponse({"success": False, "error": "订单未找到或无法删除"}, status=404)
 
-#订单视图
+
 @login_required
 def order_view(request):
-    user_id = request.session.get('consumer_user_id')
+    """
+    订单列表视图
+    
+    Args:
+        request: Django HttpRequest 对象
+    
+    Returns:
+        HttpResponse: 渲染订单列表页面
+    """
+    user_id = get_consumer_user_id(request)
 
-    # 获取时间范围参数
-    start_date = request.GET.get('start_date')  # 格式: YYYY-MM-DD
-    end_date = request.GET.get('end_date')  # 格式: YYYY-MM-DD
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
 
-    # 初始化订单查询集
-    orders = Order.objects.filter(user_id=user_id, status__in=["Pending", "Shipped", "Delivered", "Completed"]).order_by('-timestamp')
+    orders = Order.objects.filter(user_id=user_id, order_status__in=["Pending", "Shipped", "Delivered", "Completed"]).order_by('-order_timestamp')
 
-    # 按时间范围过滤
     if start_date:
-        orders = orders.filter(timestamp__gte=datetime.strptime(start_date, '%Y-%m-%d'))
+        orders = orders.filter(order_timestamp__gte=datetime.strptime(start_date, '%Y-%m-%d'))
     if end_date:
-        orders = orders.filter(timestamp__lte=datetime.strptime(end_date, '%Y-%m-%d'))
+        orders = orders.filter(order_timestamp__lte=datetime.strptime(end_date, '%Y-%m-%d'))
 
     return render(request, 'order.html', {'orders': orders, 'start_date': start_date, 'end_date': end_date})
 
-# 确认收货视图
+
 @login_required
-def confirm_receipt(request, order_id):
+def confirm_receipt_view(request, order_id):
+    """
+    确认收货
+    
+    Args:
+        request: Django HttpRequest 对象
+        order_id (str): 订单 ID
+    
+    Returns:
+        JsonResponse: 操作结果的 JSON 响应
+    """
     if request.method == "POST":
         try:
-            # 获取订单对象并检查状态
             order = Order.objects.get(order_id=order_id)
-            if order.status == "Delivered":
-                order.status = "Completed"
+            if order.order_status == "Delivered":
+                order.order_status = "Completed"
                 order.save()
                 return JsonResponse({"success": True, "message": "订单已确认收货"})
             else:
                 return JsonResponse({"success": False, "message": "订单状态不允许确认收货"})
         except Order.DoesNotExist:
             return JsonResponse({"success": False, "message": "订单未找到"}, status=404)
-        except Exception as e:
-            # 捕获其他异常并返回错误信息
-            return JsonResponse({"success": False, "message": str(e)}, status=500)
+        except Exception as error:
+            return JsonResponse({"success": False, "message": str(error)}, status=500)
     return JsonResponse({"success": False, "message": "无效请求"}, status=400)
 
 
-# 评论订单商品视图
 @login_required
-def add_comment_for_order(request, order_id, product_id):
+def add_comment_for_order_view(request, order_id, product_id):
+    """
+    为订单商品添加评论
+    
+    Args:
+        request: Django HttpRequest 对象
+        order_id (str): 订单 ID
+        product_id (int): 商品 ID
+    
+    Returns:
+        JsonResponse: 操作结果的 JSON 响应
+    """
     if request.method == "POST":
-        user_id = request.session.get('consumer_user_id')
+        user_id = get_consumer_user_id(request)
         order = Order.objects.filter(order_id=order_id, user_id=user_id).first()
 
         if order:
-            if order.status == "Completed":
-                content = request.POST.get("content")
-                rating = float(request.POST.get("rating"))
+            if order.order_status == "Completed":
+                comment_content = request.POST.get("content")
+                comment_rating = float(request.POST.get("rating"))
 
-                # 调用 Comment 的静态方法插入评论
-                response = Comment.add_comment(
+                response = Comment.create_new_comment(
                     product_id=product_id,
                     user_id=user_id,
-                    content=content,
-                    rating=rating
+                    content=comment_content,
+                    rating=comment_rating
                 )
 
                 return JsonResponse(response, status=200 if response["success"] else 500)
@@ -349,9 +484,18 @@ def add_comment_for_order(request, order_id, product_id):
         return JsonResponse({"success": False, "message": "订单未找到或无法评论"})
     return JsonResponse({"success": False, "message": "无效请求"})
 
-#个人信息视图
+
 @login_required
 def user_profile_view(request):
+    """
+    用户个人信息视图
+    
+    Args:
+        request: Django HttpRequest 对象
+    
+    Returns:
+        HttpResponse: 渲染用户个人信息页面
+    """
     user_id = request.session.get('user_id')
     if not user_id:
         return redirect('login')
