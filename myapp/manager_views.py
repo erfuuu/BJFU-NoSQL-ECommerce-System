@@ -9,50 +9,91 @@ from django.views.decorators.http import require_http_methods
 from .models import Log, Comment, Product, UserProfile
 from .views import login_required
 
+
+MANAGER_LOGS_PAGE_SIZE = 20
+MANAGER_COMMENTS_PAGE_SIZE = 20
+MANAGER_USERS_PAGE_SIZE = 10
+
+
+def get_manager_user_id(request):
+    """
+    从 session 中获取管理员用户 ID
+    
+    Args:
+        request: Django HttpRequest 对象
+    
+    Returns:
+        str: 管理员用户 ID，如果未登录则返回 None
+    """
+    return request.session.get('manager_user_id')
+
+
+def verify_manager_permission(request):
+    """
+    验证用户是否为管理员
+    
+    Args:
+        request: Django HttpRequest 对象
+    
+    Returns:
+        UserProfile: 管理员用户对象，如果不是管理员则返回 None
+    """
+    manager_user_id = get_manager_user_id(request)
+    user = UserProfile.objects(user_id=manager_user_id).first()
+    
+    if user and user.user_type == 'manager':
+        return user
+    return None
+
+
 @login_required
 def logs_view(request):
-    query = request.GET.get('query', '')  # 事件类型
-    user_id = request.GET.get('user_id', '')  # 用户ID
-    start_date = request.GET.get('start_date')  # 开始日期
-    end_date = request.GET.get('end_date')  # 结束日期
-    page_number = request.GET.get('page', 1)  # 当前页码
+    """
+    系统日志视图
+    
+    Args:
+        request: Django HttpRequest 对象
+    
+    Returns:
+        HttpResponse: 渲染日志管理页面
+    """
+    event_type_filter = request.GET.get('query', '')
+    user_id_filter = request.GET.get('user_id', '')
+    start_date_filter = request.GET.get('start_date')
+    end_date_filter = request.GET.get('end_date')
+    page_number = request.GET.get('page', 1)
 
-    # 初始查询集
     logs = Log.objects.all()
 
-    # 按事件类型筛选
-    if query:
-        logs = logs.filter(event_type__icontains=query)
+    if event_type_filter:
+        logs = logs.filter(log_event_type__icontains=event_type_filter)
 
-    # 按用户ID筛选
-    if user_id:
-        logs = logs.filter(user_id=user_id)
+    if user_id_filter:
+        logs = logs.filter(log_user_id=user_id_filter)
 
-    # 按时间范围筛选
-    if start_date:
+    if start_date_filter:
         try:
-            start_date_obj = datetime.strptime(start_date, "%Y-%m-%d")
-            logs = logs.filter(timestamp__gte=start_date_obj)
+            start_date_obj = datetime.strptime(start_date_filter, "%Y-%m-%d")
+            logs = logs.filter(log_timestamp__gte=start_date_obj)
         except ValueError:
-            pass  # 如果日期格式无效，忽略此条件
-    if end_date:
-        try:
-            end_date_obj = datetime.strptime(end_date, "%Y-%m-%d")
-            logs = logs.filter(timestamp__lte=end_date_obj)
-        except ValueError:
-            pass  # 如果日期格式无效，忽略此条件
+            pass
 
-    # 添加分页
-    paginator = Paginator(logs.order_by('-timestamp'), 20)  # 每页20条
+    if end_date_filter:
+        try:
+            end_date_obj = datetime.strptime(end_date_filter, "%Y-%m-%d")
+            logs = logs.filter(log_timestamp__lte=end_date_obj)
+        except ValueError:
+            pass
+
+    paginator = Paginator(logs.order_by('-log_timestamp'), MANAGER_LOGS_PAGE_SIZE)
     page_obj = paginator.get_page(page_number)
 
-    # 返回上下文
     context = {
         'logs': page_obj,
-        'query': query,
-        'user_id': user_id,
-        'start_date': start_date,
-        'end_date': end_date,
+        'query': event_type_filter,
+        'user_id': user_id_filter,
+        'start_date': start_date_filter,
+        'end_date': end_date_filter,
         'page_obj': page_obj,
     }
     return render(request, 'admin_logs.html', context)
@@ -60,43 +101,53 @@ def logs_view(request):
 
 @login_required
 def comments_view(request):
-    user_id = request.session.get('user_id')
-    user = UserProfile.objects(user_id=user_id).first()
-
-    # 确保只有管理员可以访问
-    if not user or user.type != 'manager':
+    """
+    评论管理视图
+    
+    Args:
+        request: Django HttpRequest 对象
+    
+    Returns:
+        HttpResponse: 渲染评论管理页面
+    """
+    manager_user = verify_manager_permission(request)
+    if not manager_user:
         return JsonResponse({"success": False, "message": "权限不足"}, status=403)
 
-    # 获取筛选条件
-    query = request.GET.get('user_id', '')  # 用户ID筛选
-    page = request.GET.get('page', 1)  # 当前页码
+    user_id_filter = request.GET.get('user_id', '')
+    page_number = request.GET.get('page', 1)
 
-    # 查询评论
-    if query:
-        comments = Comment.objects.filter(user_id__icontains=query).order_by('-timestamp')
+    if user_id_filter:
+        comments = Comment.objects.filter(user_id__icontains=user_id_filter).order_by('-comment_timestamp')
     else:
-        comments = Comment.objects.all().order_by('-timestamp')
+        comments = Comment.objects.all().order_by('-comment_timestamp')
 
-    # 分页处理，每页显示20条评论
-    paginator = Paginator(comments, 20)
-    page_obj = paginator.get_page(page)
+    paginator = Paginator(comments, MANAGER_COMMENTS_PAGE_SIZE)
+    page_obj = paginator.get_page(page_number)
 
-    # 渲染评论管理页面
     return render(request, 'admin_comments.html', {
         'comments': page_obj,
-        'query': query,
+        'query': user_id_filter,
         'page_obj': page_obj,
     })
 
-@csrf_exempt  # 确保支持 AJAX 请求
+
+@csrf_exempt
 @login_required
 @require_http_methods(["DELETE"])
 def delete_comment_view(request, comment_id):
-    user_id = request.session.get('user_id')
-    user = UserProfile.objects(user_id=user_id).first()
-
-    # 确保只有管理员可以删除评论
-    if not user or user.type != 'manager':
+    """
+    删除评论视图
+    
+    Args:
+        request: Django HttpRequest 对象
+        comment_id (int): 评论 ID
+    
+    Returns:
+        JsonResponse: 操作结果的 JSON 响应
+    """
+    manager_user = verify_manager_permission(request)
+    if not manager_user:
         return JsonResponse({"success": False, "message": "权限不足"}, status=403)
 
     comment = Comment.objects.filter(comment_id=comment_id).first()
@@ -106,76 +157,89 @@ def delete_comment_view(request, comment_id):
     else:
         return JsonResponse({"success": False, "message": "评论未找到"}, status=404)
 
+
 @login_required
 def clicks_view(request):
-    user_id = request.session.get('user_id')
-    user = UserProfile.objects(user_id=user_id).first()
-
-    # 验证用户权限
-    if not user or user.type != 'manager':
+    """
+    商品点击量统计视图
+    
+    Args:
+        request: Django HttpRequest 对象
+    
+    Returns:
+        HttpResponse: 渲染点击量统计页面
+    """
+    manager_user = verify_manager_permission(request)
+    if not manager_user:
         return redirect('login')
 
-    # 获取查询参数并筛选产品
-    query = request.GET.get('product_id', '')
-    if query:
-        products = Product.objects.filter(product_id=int(query))
+    product_id_filter = request.GET.get('product_id', '')
+    if product_id_filter:
+        products = Product.objects.filter(product_id=int(product_id_filter))
     else:
         products = Product.objects.all()
 
-    # 按点击量降序排序
-    products = sorted(products, key=lambda x: x.clicks, reverse=True)
+    products = sorted(products, key=lambda x: x.product_click_count, reverse=True)
 
-    # 将 MongoEngine 查询结果手动转换为字典列表
     products_list = [
         {
             "product_id": product.product_id,
-            "name": product.name,
-            "clicks": product.clicks
+            "name": product.product_name,
+            "clicks": product.product_click_count
         }
         for product in products
     ]
 
-    # 渲染模板
-    return render(request, 'admin_clicks.html', {'products': products_list, 'query': query})
+    return render(request, 'admin_clicks.html', {'products': products_list, 'query': product_id_filter})
 
 
 @login_required
 def users_view(request):
-    user_id = request.session.get('user_id')
-    user = UserProfile.objects(user_id=user_id).first()
-
-    # 确保只有管理员可以访问
-    if not user or user.type != 'manager':
+    """
+    用户管理视图
+    
+    Args:
+        request: Django HttpRequest 对象
+    
+    Returns:
+        HttpResponse: 渲染用户管理页面
+    """
+    manager_user = verify_manager_permission(request)
+    if not manager_user:
         return redirect('login')
 
-    # 获取搜索条件和分页参数
-    query = request.GET.get('user_id', '')
+    user_id_filter = request.GET.get('user_id', '')
     page_number = request.GET.get('page', 1)
 
-    # 查询用户
-    users = UserProfile.objects.filter(user_id__icontains=query) if query else UserProfile.objects.all()
+    users = UserProfile.objects.filter(user_id__icontains=user_id_filter) if user_id_filter else UserProfile.objects.all()
 
-    # 分页
-    paginator = Paginator(users, 10)  # 每页10个用户
+    paginator = Paginator(users, MANAGER_USERS_PAGE_SIZE)
     page_obj = paginator.get_page(page_number)
 
-    # 渲染用户管理页面
-    return render(request, 'admin_users.html', {'users': page_obj, 'query': query, 'page_obj': page_obj})
+    return render(request, 'admin_users.html', {'users': page_obj, 'query': user_id_filter, 'page_obj': page_obj})
 
-@csrf_exempt  # 确保支持 AJAX 请求
+
+@csrf_exempt
 @login_required
 @require_http_methods(["DELETE"])
 def delete_user_view(request, user_id):
-    admin_user_id = request.session.get('user_id')
-    admin_user = UserProfile.objects(user_id=admin_user_id).first()
-
-    # 确保只有管理员可以删除用户
-    if not admin_user or admin_user.type != 'manager':
+    """
+    删除用户视图
+    
+    Args:
+        request: Django HttpRequest 对象
+        user_id (str): 用户 ID
+    
+    Returns:
+        JsonResponse: 操作结果的 JSON 响应
+    """
+    admin_user = verify_manager_permission(request)
+    if not admin_user:
         return JsonResponse({"success": False, "message": "权限不足"}, status=403)
 
     user_to_delete = UserProfile.objects.filter(user_id=user_id).first()
     if user_to_delete:
-        if user_to_delete.type == 'manager':
+        if user_to_delete.user_type == 'manager':
             return JsonResponse({"success": False, "message": "不能删除管理员账户"}, status=403)
         user_to_delete.delete()
         return JsonResponse({"success": True, "message": f"用户 {user_id} 已成功删除"})

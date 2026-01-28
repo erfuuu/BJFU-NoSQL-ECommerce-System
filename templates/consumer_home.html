@@ -15,7 +15,7 @@
     <div class="product-grid">
         {% if products %}
             {% for product in products %}
-                <div class="product">
+                <div class="product" data-product-id="{{ product.product_id }}">
                     <a href="{% url 'product_detail' product.product_id %}">
                         <img src="{{ product.image_url }}" alt="{{ product.name }}"/>
                         <h3>{{ product.name }}</h3>
@@ -23,7 +23,7 @@
                     <p>{{ product.description }}</p>
                     <p>价格: ￥{{ product.price }}</p>
                     <p>销量: {{ product.sales_volume }}</p>
-                    <p>点击量: <span class="product-clicks">{{ product.clicks }}</span></p>
+                    <p>点击量: <span class="product-clicks" id="clicks-{{ product.product_id }}">{{ product.clicks }}</span></p>
                 </div>
             {% endfor %}
         {% else %}
@@ -49,6 +49,60 @@
             {% endif %}
         </ul>
     </div>
+
+    <script>
+        // 定期更新点击量数据
+        function updateClicks() {
+            const products = document.querySelectorAll('.product');
+            const productIds = Array.from(products).map(p => p.getAttribute('data-product-id'));
+            
+            if (productIds.length === 0) return;
+
+            // 获取最新的点击量数据
+            fetch('/api/get_product_clicks/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken')
+                },
+                body: JSON.stringify({ product_ids: productIds })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    data.clicks_data.forEach(item => {
+                        const clicksElement = document.getElementById(`clicks-${item.product_id}`);
+                        if (clicksElement) {
+                            clicksElement.textContent = item.clicks;
+                        }
+                    });
+                }
+            })
+            .catch(error => console.error('更新点击量失败:', error));
+        }
+
+        // 获取CSRF token
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // 页面加载时更新一次，然后每5秒更新一次
+        document.addEventListener('DOMContentLoaded', function() {
+            updateClicks();
+            setInterval(updateClicks, 5000); // 每5秒更新一次点击量
+        });
+    </script>
 
     <style>
 
