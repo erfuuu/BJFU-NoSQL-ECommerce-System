@@ -66,8 +66,8 @@
         <a href="{% url 'orders' %}">所有订单</a>
     </div>
     <div class="user-info">
-        {% if request.session.user_id %}
-            <a href="{% url 'business_profile' %}">用户ID: {{ request.session.user_id }}</a>
+        {% if request.session.business_user_id %}
+            <a href="{% url 'business_profile' %}">用户ID: {{ request.session.business_user_id }}</a>
         {% else %}
             <a href="{% url 'login' %}">请登录</a>
         {% endif %}

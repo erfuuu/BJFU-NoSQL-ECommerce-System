@@ -24,6 +24,7 @@ urlpatterns = [
     path('order/confirm_receipt/<str:order_id>/', consumer_views.confirm_receipt, name='confirm_receipt'),
     path('order/add_comment_for_order/<str:order_id>/<int:product_id>/', consumer_views.add_comment_for_order,
          name='add_comment_for_order'),
+    path('api/get_product_clicks/', consumer_views.get_product_clicks, name='get_product_clicks'),  # 获取商品点击量API
 
     # 商家视图
     path('business/home/', business_views.business_home, name='business_home'),
