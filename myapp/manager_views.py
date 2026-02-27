@@ -7,9 +7,9 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from .models import Log, Comment, Product, UserProfile
-from .views import login_required
+from .views import login_required, manager_required
 
-@login_required
+@manager_required
 def logs_view(request):
     query = request.GET.get('query', '')  # 事件类型
     user_id = request.GET.get('user_id', '')  # 用户ID
@@ -58,15 +58,8 @@ def logs_view(request):
     return render(request, 'admin_logs.html', context)
 
 
-@login_required
+@manager_required
 def comments_view(request):
-    user_id = request.session.get('user_id')
-    user = UserProfile.objects(user_id=user_id).first()
-
-    # 确保只有管理员可以访问
-    if not user or user.type != 'manager':
-        return JsonResponse({"success": False, "message": "权限不足"}, status=403)
-
     # 获取筛选条件
     query = request.GET.get('user_id', '')  # 用户ID筛选
     page = request.GET.get('page', 1)  # 当前页码
@@ -89,16 +82,9 @@ def comments_view(request):
     })
 
 @csrf_exempt  # 确保支持 AJAX 请求
-@login_required
+@manager_required
 @require_http_methods(["DELETE"])
 def delete_comment_view(request, comment_id):
-    user_id = request.session.get('user_id')
-    user = UserProfile.objects(user_id=user_id).first()
-
-    # 确保只有管理员可以删除评论
-    if not user or user.type != 'manager':
-        return JsonResponse({"success": False, "message": "权限不足"}, status=403)
-
     comment = Comment.objects.filter(comment_id=comment_id).first()
     if comment:
         comment.delete()
@@ -106,15 +92,8 @@ def delete_comment_view(request, comment_id):
     else:
         return JsonResponse({"success": False, "message": "评论未找到"}, status=404)
 
-@login_required
+@manager_required
 def clicks_view(request):
-    user_id = request.session.get('user_id')
-    user = UserProfile.objects(user_id=user_id).first()
-
-    # 验证用户权限
-    if not user or user.type != 'manager':
-        return redirect('login')
-
     # 获取查询参数并筛选产品
     query = request.GET.get('product_id', '')
     if query:
@@ -139,15 +118,8 @@ def clicks_view(request):
     return render(request, 'admin_clicks.html', {'products': products_list, 'query': query})
 
 
-@login_required
+@manager_required
 def users_view(request):
-    user_id = request.session.get('user_id')
-    user = UserProfile.objects(user_id=user_id).first()
-
-    # 确保只有管理员可以访问
-    if not user or user.type != 'manager':
-        return redirect('login')
-
     # 获取搜索条件和分页参数
     query = request.GET.get('user_id', '')
     page_number = request.GET.get('page', 1)
@@ -163,15 +135,9 @@ def users_view(request):
     return render(request, 'admin_users.html', {'users': page_obj, 'query': query, 'page_obj': page_obj})
 
 @csrf_exempt  # 确保支持 AJAX 请求
-@login_required
+@manager_required
 @require_http_methods(["DELETE"])
 def delete_user_view(request, user_id):
-    admin_user_id = request.session.get('user_id')
-    admin_user = UserProfile.objects(user_id=admin_user_id).first()
-
-    # 确保只有管理员可以删除用户
-    if not admin_user or admin_user.type != 'manager':
-        return JsonResponse({"success": False, "message": "权限不足"}, status=403)
 
     user_to_delete = UserProfile.objects.filter(user_id=user_id).first()
     if user_to_delete:

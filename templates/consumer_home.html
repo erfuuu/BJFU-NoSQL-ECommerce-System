@@ -160,4 +160,32 @@
         }
 
     </style>
+
+    <script>
+        // 页面加载时检查并更新点击量（从商品详情页返回时）
+        document.addEventListener('DOMContentLoaded', function() {
+            const productCards = document.querySelectorAll('.product');
+            productCards.forEach(card => {
+                const link = card.querySelector('a[href*="product"]');
+                if (link) {
+                    const match = link.href.match(/\/product\/(\d+)\//);
+                    if (match) {
+                        const productId = match[1];
+                        const stored = sessionStorage.getItem('updated_product_' + productId);
+                        if (stored) {
+                            const data = JSON.parse(stored);
+                            // 只更新10秒内的记录，避免过期数据
+                            if (Date.now() - data.timestamp < 10000) {
+                                const clicksSpan = card.querySelector('.product-clicks');
+                                if (clicksSpan) {
+                                    clicksSpan.textContent = data.clicks;
+                                }
+                            }
+                            sessionStorage.removeItem('updated_product_' + productId);
+                        }
+                    }
+                }
+            });
+        });
+    </script>
 {% endblock %}

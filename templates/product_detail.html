@@ -237,5 +237,15 @@
         .catch(error => console.error("请求错误:", error));
 }
 
+        // 页面返回时记录商品点击量已更新，用于首页实时刷新
+        window.addEventListener('beforeunload', function() {
+            const productId = {{ product.product_id }};
+            const clicks = {{ product.clicks }};
+            sessionStorage.setItem('updated_product_' + productId, JSON.stringify({
+                clicks: clicks,
+                timestamp: Date.now()
+            }));
+        });
+
     </script>
 {% endblock %}
