@@ -8,6 +8,7 @@ urlpatterns = [
     path('', views.login_view, name='home'),  # 将根路径映射到登录视图
     path('register/', views.register_view, name='register'),
     path('login/', views.login_view, name='login'),
+    path('api/check_auth/', views.check_auth_status, name='check_auth'),  # 身份验证检查API
 
     # 消费者视图
     path('home/', consumer_views.consumer_home_view, name='consumer_home'),
