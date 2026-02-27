@@ -160,4 +160,39 @@
         }
 
     </style>
+    <script>
+        function refreshClicks() {
+            fetch('{% url "get_product_clicks" %}')
+                .then(response => response.json())
+                .then(data => {
+                    const clicksMap = data.clicks;
+                    document.querySelectorAll('.product').forEach(product => {
+                        const link = product.querySelector('a[href*="/product/"]');
+                        if (link) {
+                            const productId = link.href.match(/\/product\/(\d+)/;
+                            if (productId && clicksMap[productId[1]]) {
+                                const clicksSpan = product.querySelector('.product-clicks');
+                                if (clicksSpan) {
+                                    clicksSpan.textContent = clicksMap[productId[1]];
+                                }
+                            }
+                        }
+                    });
+                })
+                .catch(err => console.error('刷新点击量失败:', err));
+        }
+
+        document.addEventListener('DOMContentLoaded', refreshClicks);
+
+        if (window.performance && window.performance.navigation) {
+            if (window.performance.navigation.type === 2) {
+                setTimeout(refreshClicks, 100);
+            }
+        } else if (performance.getEntriesByType) {
+            const navEntry = performance.getEntriesByType('navigation')[0];
+            if (navEntry && navEntry.type === 'back_forward') {
+                setTimeout(refreshClicks, 100);
+            }
+        }
+    </script>
 {% endblock %}

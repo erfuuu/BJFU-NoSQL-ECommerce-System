@@ -39,9 +39,14 @@ def login_view(request):
         user = UserProfile.objects(user_id=user_id, password=password).first()
 
         if user:
-            # 记录登录事件
             create_log(event_type="login", user_id=user.user_id, details={"status": "success"})
+            
+            session_key = f'user_id_{user.type}'
+            request.session[session_key] = user.user_id
+            
             request.session['user_id'] = user.user_id
+            request.session['user_type'] = user.type
+            
             if user.type == 'consumer':
                 return redirect('consumer_home')
             elif user.type == 'business':
@@ -49,7 +54,6 @@ def login_view(request):
             elif user.type == 'manager':
                 return redirect('logs_view')
         else:
-            # 记录失败的登录尝试
             create_log(event_type="login", details={"user_id": user_id, "status": "failed"})
             messages.error(request, "用户名或密码错误")
 
@@ -89,17 +93,76 @@ def register_view(request):
 # 自定义登录验证装饰器
 def login_required(view_func):
     def _wrapped_view(request, *args, **kwargs):
-        # 直接从request.session中获取用户ID
         user_id = request.session.get('user_id')
         if user_id:
             try:
-                # 验证用户是否存在
                 UserProfile.objects.get(user_id=user_id)
                 return view_func(request, *args, **kwargs)
             except DoesNotExist:
-                # 用户不存在，清除会话并重定向到登录页面
                 request.session.flush()
-        # 如果用户未登录，重定向到登录页面
         return redirect('login')
     return _wrapped_view
+
+def consumer_required(view_func):
+    def _wrapped_view(request, *args, **kwargs):
+        user_id = request.session.get('user_id_consumer')
+        if user_id:
+            try:
+                user = UserProfile.objects.get(user_id=user_id)
+                if user.type == 'consumer':
+                    request.session['user_id'] = user_id
+                    request.session['user_type'] = 'consumer'
+                    return view_func(request, *args, **kwargs)
+            except DoesNotExist:
+                pass
+        messages.error(request, "请先登录消费者账号")
+        return redirect('login')
+    return _wrapped_view
+
+def business_required(view_func):
+    def _wrapped_view(request, *args, **kwargs):
+        user_id = request.session.get('user_id_business')
+        if user_id:
+            try:
+                user = UserProfile.objects.get(user_id=user_id)
+                if user.type == 'business':
+                    request.session['user_id'] = user_id
+                    request.session['user_type'] = 'business'
+                    return view_func(request, *args, **kwargs)
+            except DoesNotExist:
+                pass
+        messages.error(request, "请先登录商家账号")
+        return redirect('login')
+    return _wrapped_view
+
+def manager_required(view_func):
+    def _wrapped_view(request, *args, **kwargs):
+        user_id = request.session.get('user_id_manager')
+        if user_id:
+            try:
+                user = UserProfile.objects.get(user_id=user_id)
+                if user.type == 'manager':
+                    request.session['user_id'] = user_id
+                    request.session['user_type'] = 'manager'
+                    return view_func(request, *args, **kwargs)
+            except DoesNotExist:
+                pass
+        messages.error(request, "请先登录管理员账号")
+        return redirect('login')
+    return _wrapped_view
+
+def logout_view(request):
+    user_type = request.session.get('user_type')
+    if user_type:
+        session_key = f'user_id_{user_type}'
+        if session_key in request.session:
+            del request.session[session_key]
+    
+    if 'user_id' in request.session:
+        del request.session['user_id']
+    if 'user_type' in request.session:
+        del request.session['user_type']
+    
+    messages.success(request, "已成功退出登录")
+    return redirect('login')
 
