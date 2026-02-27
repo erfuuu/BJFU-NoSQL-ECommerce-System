@@ -107,9 +107,9 @@
             <a href="{% url 'users_view' %}">用户管理</a>
         </div>
         <div class="navbar-right">
-            {% if request.session.user_id %}
+            {% if request.session.manager_user_id %}
                 <span>身份: 管理员</span>
-                <span>用户ID: {{ request.session.user_id }}</span>
+                <span>用户ID: {{ request.session.manager_user_id }}</span>
             {% else %}
                 <span>未登录</span>
             {% endif %}
