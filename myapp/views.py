@@ -41,7 +41,10 @@ def login_view(request):
         if user:
             # 记录登录事件
             create_log(event_type="login", user_id=user.user_id, details={"status": "success"})
+            # 清除之前的session，防止不同身份数据混淆
+            request.session.flush()
             request.session['user_id'] = user.user_id
+            request.session['user_type'] = user.type  # 存储用户类型到session
             if user.type == 'consumer':
                 return redirect('consumer_home')
             elif user.type == 'business':
@@ -102,4 +105,83 @@ def login_required(view_func):
         # 如果用户未登录，重定向到登录页面
         return redirect('login')
     return _wrapped_view
+
+
+# 消费者身份验证装饰器
+def consumer_required(view_func):
+    def _wrapped_view(request, *args, **kwargs):
+        user_id = request.session.get('user_id')
+        user_type = request.session.get('user_type')
+        if user_id and user_type == 'consumer':
+            try:
+                user = UserProfile.objects.get(user_id=user_id)
+                if user.type == 'consumer':
+                    return view_func(request, *args, **kwargs)
+            except DoesNotExist:
+                pass
+        request.session.flush()
+        messages.error(request, "请先以消费者身份登录")
+        return redirect('login')
+    return _wrapped_view
+
+
+# 商家身份验证装饰器
+def business_required(view_func):
+    def _wrapped_view(request, *args, **kwargs):
+        user_id = request.session.get('user_id')
+        user_type = request.session.get('user_type')
+        if user_id and user_type == 'business':
+            try:
+                user = UserProfile.objects.get(user_id=user_id)
+                if user.type == 'business':
+                    return view_func(request, *args, **kwargs)
+            except DoesNotExist:
+                pass
+        request.session.flush()
+        messages.error(request, "请先以商家身份登录")
+        return redirect('login')
+    return _wrapped_view
+
+
+# 管理员身份验证装饰器
+def manager_required(view_func):
+    def _wrapped_view(request, *args, **kwargs):
+        user_id = request.session.get('user_id')
+        user_type = request.session.get('user_type')
+        if user_id and user_type == 'manager':
+            try:
+                user = UserProfile.objects.get(user_id=user_id)
+                if user.type == 'manager':
+                    return view_func(request, *args, **kwargs)
+            except DoesNotExist:
+                pass
+        request.session.flush()
+        messages.error(request, "请先以管理员身份登录")
+        return redirect('login')
+    return _wrapped_view
+
+
+# 身份验证检查API
+def check_auth_status(request):
+    """检查当前session中的用户身份"""
+    user_id = request.session.get('user_id')
+    user_type = request.session.get('user_type')
+    
+    if user_id and user_type:
+        try:
+            user = UserProfile.objects.get(user_id=user_id)
+            if user.type == user_type:
+                return JsonResponse({
+                    'authenticated': True,
+                    'user_id': user_id,
+                    'user_type': user_type
+                })
+        except DoesNotExist:
+            pass
+    
+    return JsonResponse({
+        'authenticated': False,
+        'user_id': None,
+        'user_type': None
+    })
 

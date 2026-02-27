@@ -2,6 +2,9 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>{% block title %}页面标题{% endblock %}</title>
     <style>
         body {
@@ -118,5 +121,53 @@
 
     <!-- 页面自定义脚本 -->
     {% block scripts %}{% endblock %}
+
+    <!-- 身份验证检查脚本 - 防止多标签页登录冲突 -->
+    <script>
+        // 存储当前页面期望的用户类型
+        const expectedUserType = 'consumer';
+        const expectedUserId = '{{ request.session.user_id }}';
+        
+        // 定期检查身份验证状态
+        function checkAuthStatus() {
+            fetch('/api/check_auth/')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.authenticated) {
+                        // 如果当前session是其他身份，刷新页面会触发装饰器重定向
+                        if (data.user_type !== expectedUserType) {
+                            console.log('检测到身份变化，即将刷新页面...');
+                            alert('您的登录状态已发生变化，页面将刷新。');
+                            window.location.reload();
+                        }
+                        // 如果用户ID发生变化，也刷新页面
+                        else if (expectedUserId && data.user_id !== expectedUserId) {
+                            console.log('检测到用户变化，即将刷新页面...');
+                            alert('您的登录状态已发生变化，页面将刷新。');
+                            window.location.reload();
+                        }
+                    } else if (expectedUserId) {
+                        // 如果当前页面认为已登录但session已失效
+                        console.log('检测到登出状态，即将刷新页面...');
+                        alert('您的登录状态已发生变化，页面将刷新。');
+                        window.location.reload();
+                    }
+                })
+                .catch(error => console.error('身份验证检查失败:', error));
+        }
+        
+        // 页面可见性变化时立即检查
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                checkAuthStatus();
+            }
+        });
+        
+        // 每30秒检查一次
+        setInterval(checkAuthStatus, 30000);
+        
+        // 页面加载完成后立即检查一次
+        document.addEventListener('DOMContentLoaded', checkAuthStatus);
+    </script>
 </body>
 </html>

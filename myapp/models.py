@@ -98,12 +98,15 @@ class Comment(Document):
 class Order(Document):
     order_id = StringField(required=True, unique=True)
     user_id = StringField(required=True, max_length=100)
-    product_list = ListField(DictField())  # 示例: [{"product_id": 1, "quantity": 2}]
-    total_amount = DecimalField(precision=2)
+    product_list = ListField(DictField(), default=list)  # 示例: [{"product_id": 1, "quantity": 2}]
+    total_amount = DecimalField(precision=2, default=Decimal('0.00'))
     status = StringField(choices=["In Cart", "Pending", "Shipped", "Delivered", "Completed"], default="In Cart")
     timestamp = DateTimeField(default=datetime.utcnow)
-    order_address = StringField(max_length=255)  # 确保字段定义无误
-    order_phone = StringField(max_length=20)
+    order_address = StringField(max_length=255, default="")  # 确保字段定义无误
+    order_phone = StringField(max_length=20, default="")
+    return_reason = StringField(max_length=500, default="")  # 退货原因
+    refund_reason = StringField(max_length=500, default="")  # 退款原因
+    refund_timestamp = DateTimeField(default=None, null=True)  # 退款时间
 
     meta = {
         'collection': 'orders'  # 确保集合名称与 MongoDB 中的名称一致
@@ -122,6 +125,21 @@ class Order(Document):
                 # 将 item["quantity"] 转换为整数
                 total += product.price * int(item["quantity"])
         self.total_amount = total
+
+    def clean(self):
+        """确保字段有默认值"""
+        if not self.order_address:
+            self.order_address = ""
+        if not self.order_phone:
+            self.order_phone = ""
+        if not self.product_list:
+            self.product_list = []
+        if self.total_amount is None:
+            self.total_amount = Decimal('0.00')
+        if not self.return_reason:
+            self.return_reason = ""
+        if not self.refund_reason:
+            self.refund_reason = ""
 
 class Log(Document):
     event_type = StringField(required=True, max_length=100)  # 事件类型 (如 "login", "view_product", "create_order" 等)
