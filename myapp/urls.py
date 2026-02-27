@@ -8,6 +8,7 @@ urlpatterns = [
     path('', views.login_view, name='home'),  # 将根路径映射到登录视图
     path('register/', views.register_view, name='register'),
     path('login/', views.login_view, name='login'),
+    path('logout/', views.logout_view, name='logout'),
 
     # 消费者视图
     path('home/', consumer_views.consumer_home_view, name='consumer_home'),
@@ -24,6 +25,7 @@ urlpatterns = [
     path('order/confirm_receipt/<str:order_id>/', consumer_views.confirm_receipt, name='confirm_receipt'),
     path('order/add_comment_for_order/<str:order_id>/<int:product_id>/', consumer_views.add_comment_for_order,
          name='add_comment_for_order'),
+    path('api/product_clicks/', consumer_views.get_product_clicks, name='get_product_clicks'),
 
     # 商家视图
     path('business/home/', business_views.business_home, name='business_home'),

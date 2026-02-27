@@ -110,6 +110,7 @@
             {% if request.session.user_id %}
                 <span>身份: 管理员</span>
                 <span>用户ID: {{ request.session.user_id }}</span>
+                <a href="{% url 'logout' %}" style="color: white; margin-left: 15px;">退出登录</a>
             {% else %}
                 <span>未登录</span>
             {% endif %}

@@ -89,7 +89,8 @@ def add_product(request):
 
 @login_required
 def update_product(request):
-    if request.method == 'GET' and request.is_ajax():
+    is_ajax = request.META.get('HTTP_X_REQUESTED_WITH') == 'XMLHttpRequest'
+    if request.method == 'GET' and is_ajax:
         product_id = request.GET.get('product_id')
         product = Product.objects.filter(product_id=product_id).first()
 

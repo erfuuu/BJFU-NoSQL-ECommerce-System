@@ -339,3 +339,8 @@ def user_profile_view(request):
         messages.success(request, "个人信息已更新")
 
     return render(request, 'user_profile.html', {'user_profile': user_profile})
+
+def get_product_clicks(request):
+    products = Product.objects.all()
+    clicks_data = {str(p.product_id): p.clicks for p in products}
+    return JsonResponse({'clicks': clicks_data})
