@@ -4,17 +4,19 @@ from django.shortcuts import render, redirect
 from django.contrib import messages
 import json
 
+from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from mongoengine import Q
 from .models import Product, Comment, Order, UserProfile
 from datetime import datetime
 import uuid
-from .views import login_required, create_log
+from .views import login_required, consumer_required, create_log, get_user_id_by_type
 
 
 # 消费者主页面
-@login_required
+@never_cache
+@consumer_required
 def consumer_home_view(request):
     query = request.GET.get('query', '').strip()  # 获取搜索关键字
     products = Product.objects.all().order_by('-sales_volume')  # 默认按销量降序排列
@@ -38,9 +40,14 @@ def consumer_home_view(request):
     page_number = request.GET.get('page')
     products_page = paginator.get_page(page_number)
 
-    return render(request, 'consumer_home.html', {'products': products_page, 'query': query})
+    response = render(request, 'consumer_home.html', {'products': products_page, 'query': query})
+    response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response['Pragma'] = 'no-cache'
+    response['Expires'] = '0'
+    return response
 
 
+@never_cache
 def search_products(request):
     query = request.GET.get('query', '').strip()  # 获取搜索关键字
     all_products = Product.objects.all().order_by('-sales_volume')  # 默认按销量降序排列
@@ -64,13 +71,17 @@ def search_products(request):
     page_number = request.GET.get('page', 1)
     products = paginator.get_page(page_number)
 
-    return render(request, 'consumer_home.html', {
+    response = render(request, 'consumer_home.html', {
         'products': products,
         'query': query,
     })
+    response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response['Pragma'] = 'no-cache'
+    response['Expires'] = '0'
+    return response
 
 #产品细节页面
-@login_required
+@consumer_required
 def product_detail_view(request, product_id):
     # 查询商品
     product = Product.objects(product_id=product_id).first()
@@ -100,16 +111,16 @@ def product_detail_view(request, product_id):
     }
 
     # 记录商品浏览事件
-    create_log(event_type="view_product", user_id=request.session.get('user_id'), details={"product_id": product_id})
+    create_log(event_type="view_product", user_id=get_user_id_by_type(request, 'consumer'), details={"product_id": product_id})
 
     return render(request, 'product_detail.html', context)
 
 #加入购物车
-@login_required
+@consumer_required
 def add_to_cart(request, product_id):
     if request.method == "POST":
         # 获取 session 中的 user_id
-        user_id = request.session.get('user_id')
+        user_id = get_user_id_by_type(request, 'consumer')
         if not user_id:
             return JsonResponse({"success": False, "error": "用户未登录"})
 
@@ -154,10 +165,10 @@ def add_to_cart(request, product_id):
     return JsonResponse({"success": False, "error": "无效请求"})
 
 #立即购买
-@login_required
+@consumer_required
 def buy_now(request, product_id):
     if request.method == "POST":
-        user_id = request.session.get('user_id')
+        user_id = get_user_id_by_type(request, 'consumer')
         data = json.loads(request.body)
         quantity = int(data.get("quantity", 1))
 
@@ -198,7 +209,7 @@ def buy_now(request, product_id):
     return JsonResponse({"success": False, "error": "无效请求"})
 #点赞处理视图
 @csrf_exempt
-@login_required
+@consumer_required
 def like_comment_view(request, comment_id):
     if request.method == 'POST':
         comment = Comment.objects(comment_id=comment_id).first()
@@ -210,17 +221,17 @@ def like_comment_view(request, comment_id):
 
     return JsonResponse({"success": False, "message": "仅支持 POST 请求"})
 #购物车视图
-@login_required
+@consumer_required
 def cart_view(request):
-    user_id = request.session.get('user_id')
+    user_id = get_user_id_by_type(request, 'consumer')
     in_cart_orders = Order.objects(user_id=user_id, status="In Cart")
     return render(request, 'cart.html', {'in_cart_orders': in_cart_orders})
 
 #购物车里下单
-@login_required
+@consumer_required
 def purchase_order(request, order_id):
     if request.method == "POST":
-        user_id = request.session.get('user_id')
+        user_id = get_user_id_by_type(request, 'consumer')
         order = Order.objects(order_id=order_id, user_id=user_id,status="In Cart").first()
         if order:
             order.status = "Pending"
@@ -243,10 +254,10 @@ def purchase_order(request, order_id):
     return JsonResponse({"success": False, "error": "无效请求"})
 
 #购物车里删除商品
-@login_required
+@consumer_required
 @require_http_methods(["DELETE"])
 def delete_order(request, order_id):
-    user_id = request.session.get('user_id')
+    user_id = get_user_id_by_type(request, 'consumer')
     order = Order.objects.filter(order_id=order_id, user_id=user_id, status="In Cart").first()
 
     if order:
@@ -256,9 +267,9 @@ def delete_order(request, order_id):
         return JsonResponse({"success": False, "error": "订单未找到或无法删除"}, status=404)
 
 #订单视图
-@login_required
+@consumer_required
 def order_view(request):
-    user_id = request.session.get('user_id')
+    user_id = get_user_id_by_type(request, 'consumer')
 
     # 获取时间范围参数
     start_date = request.GET.get('start_date')  # 格式: YYYY-MM-DD
@@ -276,7 +287,7 @@ def order_view(request):
     return render(request, 'order.html', {'orders': orders, 'start_date': start_date, 'end_date': end_date})
 
 # 确认收货视图
-@login_required
+@consumer_required
 def confirm_receipt(request, order_id):
     if request.method == "POST":
         try:
@@ -297,10 +308,10 @@ def confirm_receipt(request, order_id):
 
 
 # 评论订单商品视图
-@login_required
+@consumer_required
 def add_comment_for_order(request, order_id, product_id):
     if request.method == "POST":
-        user_id = request.session.get('user_id')
+        user_id = get_user_id_by_type(request, 'consumer')
         order = Order.objects.filter(order_id=order_id, user_id=user_id).first()
 
         if order:
@@ -323,9 +334,9 @@ def add_comment_for_order(request, order_id, product_id):
     return JsonResponse({"success": False, "message": "无效请求"})
 
 #个人信息视图
-@login_required
+@consumer_required
 def user_profile_view(request):
-    user_id = request.session.get('user_id')
+    user_id = get_user_id_by_type(request, 'consumer')
     if not user_id:
         return redirect('login')
 
