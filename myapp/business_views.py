@@ -8,7 +8,7 @@ from django.contrib import messages
 from django.urls import reverse
 from mongoengine import DoesNotExist
 from .models import Product, Comment, Order, UserProfile
-from .views import login_required, business_required
+from .views import login_required, business_required, get_user_id_by_type
 
 #商家主页面
 @business_required
@@ -184,7 +184,7 @@ def ship_order(request, order_id):
 #商家个人信息
 @business_required
 def business_profile(request):
-    user_id = request.session.get('user_id')
+    user_id = get_user_id_by_type(request, 'business')
     if not user_id:
         return redirect('login')
 

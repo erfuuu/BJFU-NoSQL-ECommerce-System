@@ -6,6 +6,19 @@ from mongoengine import DoesNotExist
 
 from .models import UserProfile, Log
 
+SESSION_KEYS = {
+    'consumer': 'consumer_user_id',
+    'business': 'business_user_id',
+    'manager': 'manager_user_id',
+}
+
+def get_session_key(user_type):
+    return SESSION_KEYS.get(user_type)
+
+def get_user_id_by_type(request, user_type):
+    session_key = get_session_key(user_type)
+    return request.session.get(session_key) if session_key else None
+
 def create_log(event_type, user_id=None, details=None):
     """
     创建日志记录并保存到 MongoDB 的 logs 集合中
@@ -38,27 +51,24 @@ def login_view(request):
         user = UserProfile.objects(user_id=user_id, password=password).first()
 
         if user:
-            current_user_id = request.session.get('user_id')
-            current_user_type = request.session.get('user_type')
+            session_key = get_session_key(user.type)
             
-            if current_user_id and current_user_id != user.user_id:
-                messages.error(request, "当前浏览器已有其他用户登录，请先登出或使用其他浏览器")
-                return render(request, 'login.html')
-            
-            if current_user_type and current_user_type != user.type:
-                messages.error(request, "当前浏览器已有其他类型用户登录，请先登出或使用其他浏览器")
-                return render(request, 'login.html')
+            if session_key:
+                existing_user_id = request.session.get(session_key)
+                if existing_user_id and existing_user_id != user.user_id:
+                    messages.error(request, f"当前浏览器已有{user.type}类型的其他用户登录，请先登出")
+                    return render(request, 'login.html')
 
-            # 记录登录事件
-            create_log(event_type="login", user_id=user.user_id, details={"status": "success"})
-            request.session['user_id'] = user.user_id
-            request.session['user_type'] = user.type
-            if user.type == 'consumer':
-                return redirect('consumer_home')
-            elif user.type == 'business':
-                return redirect('business_home')
-            elif user.type == 'manager':
-                return redirect('logs_view')
+                # 记录登录事件
+                create_log(event_type="login", user_id=user.user_id, details={"status": "success"})
+                request.session[session_key] = user.user_id
+                
+                if user.type == 'consumer':
+                    return redirect('consumer_home')
+                elif user.type == 'business':
+                    return redirect('business_home')
+                elif user.type == 'manager':
+                    return redirect('logs_view')
         else:
             # 记录失败的登录尝试
             create_log(event_type="login", details={"user_id": user_id, "status": "failed"})
@@ -97,25 +107,25 @@ def register_view(request):
 
     return render(request, 'register.html')
 
-# 自定义登录验证装饰器
+# 通用登录验证装饰器（检查任一类型用户是否登录）
 def login_required(view_func):
     def _wrapped_view(request, *args, **kwargs):
-        user_id = request.session.get('user_id')
-        if user_id:
-            try:
-                UserProfile.objects.get(user_id=user_id)
-                return view_func(request, *args, **kwargs)
-            except DoesNotExist:
-                pass
+        for session_key in SESSION_KEYS.values():
+            user_id = request.session.get(session_key)
+            if user_id:
+                try:
+                    UserProfile.objects.get(user_id=user_id)
+                    return view_func(request, *args, **kwargs)
+                except DoesNotExist:
+                    pass
         return redirect('login')
     return _wrapped_view
 
 # 消费者专用装饰器
 def consumer_required(view_func):
     def _wrapped_view(request, *args, **kwargs):
-        user_id = request.session.get('user_id')
-        user_type = request.session.get('user_type')
-        if user_id and user_type == 'consumer':
+        user_id = get_user_id_by_type(request, 'consumer')
+        if user_id:
             try:
                 UserProfile.objects.get(user_id=user_id)
                 return view_func(request, *args, **kwargs)
@@ -127,9 +137,8 @@ def consumer_required(view_func):
 # 商家专用装饰器
 def business_required(view_func):
     def _wrapped_view(request, *args, **kwargs):
-        user_id = request.session.get('user_id')
-        user_type = request.session.get('user_type')
-        if user_id and user_type == 'business':
+        user_id = get_user_id_by_type(request, 'business')
+        if user_id:
             try:
                 UserProfile.objects.get(user_id=user_id)
                 return view_func(request, *args, **kwargs)
@@ -141,9 +150,8 @@ def business_required(view_func):
 # 管理员专用装饰器
 def manager_required(view_func):
     def _wrapped_view(request, *args, **kwargs):
-        user_id = request.session.get('user_id')
-        user_type = request.session.get('user_type')
-        if user_id and user_type == 'manager':
+        user_id = get_user_id_by_type(request, 'manager')
+        if user_id:
             try:
                 UserProfile.objects.get(user_id=user_id)
                 return view_func(request, *args, **kwargs)
@@ -152,3 +160,26 @@ def manager_required(view_func):
         return redirect('login')
     return _wrapped_view
 
+def logout_consumer_view(request):
+    session_key = get_session_key('consumer')
+    if session_key in request.session:
+        del request.session[session_key]
+    return redirect('login')
+
+def logout_business_view(request):
+    session_key = get_session_key('business')
+    if session_key in request.session:
+        del request.session[session_key]
+    return redirect('login')
+
+def logout_manager_view(request):
+    session_key = get_session_key('manager')
+    if session_key in request.session:
+        del request.session[session_key]
+    return redirect('login')
+
+def logout_all_view(request):
+    for session_key in SESSION_KEYS.values():
+        if session_key in request.session:
+            del request.session[session_key]
+    return redirect('login')

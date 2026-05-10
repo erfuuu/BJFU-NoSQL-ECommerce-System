@@ -7,7 +7,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from .models import Log, Comment, Product, UserProfile
-from .views import login_required, manager_required
+from .views import login_required, manager_required, get_user_id_by_type
 
 @manager_required
 def logs_view(request):
@@ -60,7 +60,7 @@ def logs_view(request):
 
 @manager_required
 def comments_view(request):
-    user_id = request.session.get('user_id')
+    user_id = get_user_id_by_type(request, 'manager')
     user = UserProfile.objects(user_id=user_id).first()
 
     # 确保只有管理员可以访问
@@ -92,7 +92,7 @@ def comments_view(request):
 @manager_required
 @require_http_methods(["DELETE"])
 def delete_comment_view(request, comment_id):
-    user_id = request.session.get('user_id')
+    user_id = get_user_id_by_type(request, 'manager')
     user = UserProfile.objects(user_id=user_id).first()
 
     # 确保只有管理员可以删除评论
@@ -108,7 +108,7 @@ def delete_comment_view(request, comment_id):
 
 @manager_required
 def clicks_view(request):
-    user_id = request.session.get('user_id')
+    user_id = get_user_id_by_type(request, 'manager')
     user = UserProfile.objects(user_id=user_id).first()
 
     # 验证用户权限
@@ -141,7 +141,7 @@ def clicks_view(request):
 
 @manager_required
 def users_view(request):
-    user_id = request.session.get('user_id')
+    user_id = get_user_id_by_type(request, 'manager')
     user = UserProfile.objects(user_id=user_id).first()
 
     # 确保只有管理员可以访问
@@ -166,7 +166,7 @@ def users_view(request):
 @manager_required
 @require_http_methods(["DELETE"])
 def delete_user_view(request, user_id):
-    admin_user_id = request.session.get('user_id')
+    admin_user_id = get_user_id_by_type(request, 'manager')
     admin_user = UserProfile.objects(user_id=admin_user_id).first()
 
     # 确保只有管理员可以删除用户

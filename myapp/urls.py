@@ -8,6 +8,10 @@ urlpatterns = [
     path('', views.login_view, name='home'),  # 将根路径映射到登录视图
     path('register/', views.register_view, name='register'),
     path('login/', views.login_view, name='login'),
+    path('logout/consumer/', views.logout_consumer_view, name='logout_consumer'),
+    path('logout/business/', views.logout_business_view, name='logout_business'),
+    path('logout/manager/', views.logout_manager_view, name='logout_manager'),
+    path('logout/all/', views.logout_all_view, name='logout_all'),
 
     # 消费者视图
     path('home/', consumer_views.consumer_home_view, name='consumer_home'),
