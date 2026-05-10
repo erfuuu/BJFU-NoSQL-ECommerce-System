@@ -1,6 +1,5 @@
 from datetime import datetime
 from decimal import Decimal
-from django.contrib.sessions.models import Session
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from mongoengine import DoesNotExist
@@ -39,9 +38,21 @@ def login_view(request):
         user = UserProfile.objects(user_id=user_id, password=password).first()
 
         if user:
+            current_user_id = request.session.get('user_id')
+            current_user_type = request.session.get('user_type')
+            
+            if current_user_id and current_user_id != user.user_id:
+                messages.error(request, "当前浏览器已有其他用户登录，请先登出或使用其他浏览器")
+                return render(request, 'login.html')
+            
+            if current_user_type and current_user_type != user.type:
+                messages.error(request, "当前浏览器已有其他类型用户登录，请先登出或使用其他浏览器")
+                return render(request, 'login.html')
+
             # 记录登录事件
             create_log(event_type="login", user_id=user.user_id, details={"status": "success"})
             request.session['user_id'] = user.user_id
+            request.session['user_type'] = user.type
             if user.type == 'consumer':
                 return redirect('consumer_home')
             elif user.type == 'business':
@@ -89,19 +100,55 @@ def register_view(request):
 # 自定义登录验证装饰器
 def login_required(view_func):
     def _wrapped_view(request, *args, **kwargs):
-        # 尝试从会话中获取用户 ID
-        session_key = request.COOKIES.get('sessionid')
-        if session_key:
+        user_id = request.session.get('user_id')
+        if user_id:
             try:
-                session = Session.objects.get(session_key=session_key)
-                session_data = session.get_decoded()
-                user_id = session_data.get('user_id')
-                # 验证用户是否存在
                 UserProfile.objects.get(user_id=user_id)
                 return view_func(request, *args, **kwargs)
-            except (Session.DoesNotExist, DoesNotExist):
+            except DoesNotExist:
                 pass
-        # 如果用户未登录，重定向到登录页面
+        return redirect('login')
+    return _wrapped_view
+
+# 消费者专用装饰器
+def consumer_required(view_func):
+    def _wrapped_view(request, *args, **kwargs):
+        user_id = request.session.get('user_id')
+        user_type = request.session.get('user_type')
+        if user_id and user_type == 'consumer':
+            try:
+                UserProfile.objects.get(user_id=user_id)
+                return view_func(request, *args, **kwargs)
+            except DoesNotExist:
+                pass
+        return redirect('login')
+    return _wrapped_view
+
+# 商家专用装饰器
+def business_required(view_func):
+    def _wrapped_view(request, *args, **kwargs):
+        user_id = request.session.get('user_id')
+        user_type = request.session.get('user_type')
+        if user_id and user_type == 'business':
+            try:
+                UserProfile.objects.get(user_id=user_id)
+                return view_func(request, *args, **kwargs)
+            except DoesNotExist:
+                pass
+        return redirect('login')
+    return _wrapped_view
+
+# 管理员专用装饰器
+def manager_required(view_func):
+    def _wrapped_view(request, *args, **kwargs):
+        user_id = request.session.get('user_id')
+        user_type = request.session.get('user_type')
+        if user_id and user_type == 'manager':
+            try:
+                UserProfile.objects.get(user_id=user_id)
+                return view_func(request, *args, **kwargs)
+            except DoesNotExist:
+                pass
         return redirect('login')
     return _wrapped_view
 

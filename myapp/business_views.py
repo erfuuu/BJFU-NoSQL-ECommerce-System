@@ -8,10 +8,10 @@ from django.contrib import messages
 from django.urls import reverse
 from mongoengine import DoesNotExist
 from .models import Product, Comment, Order, UserProfile
-from .views import login_required
+from .views import login_required, business_required
 
 #商家主页面
-@login_required
+@business_required
 def business_home(request):
     products = Product.objects.all().order_by('-sales_volume')  # 默认按销量排序
     paginator = Paginator(products, 10)  # 每页10个商品
@@ -20,7 +20,7 @@ def business_home(request):
     return render(request, 'business_home.html', {'products': page_obj})
 
 #产品细节页面
-@login_required
+@business_required
 def business_product_detail(request, product_id):
     product = Product.objects(product_id=product_id).first()
     if not product:
@@ -43,7 +43,7 @@ def business_product_detail(request, product_id):
     return render(request, 'business_product_detail.html', {'product': product, 'comments': comments})
 
 #添加商品
-@login_required
+@business_required
 def add_product(request):
     if request.method == 'POST':
         name = request.POST.get('name')
@@ -87,9 +87,12 @@ def add_product(request):
 
 #更新商品
 
-@login_required
+def is_ajax(request):
+    return request.META.get('HTTP_X_REQUESTED_WITH') == 'XMLHttpRequest'
+
+@business_required
 def update_product(request):
-    if request.method == 'GET' and request.is_ajax():
+    if request.method == 'GET' and is_ajax(request):
         product_id = request.GET.get('product_id')
         product = Product.objects.filter(product_id=product_id).first()
 
@@ -137,7 +140,7 @@ def update_product(request):
 
 
 #下架商品
-@login_required
+@business_required
 def delete_product(request):
     products = Product.objects.all()
 
@@ -149,7 +152,7 @@ def delete_product(request):
     return render(request, 'business_delete_product.html', {'page_obj': page_obj})
 
 #下架按钮
-@login_required
+@business_required
 def delete_single_product(request, product_id):
     if request.method == 'POST':
         try:
@@ -160,13 +163,13 @@ def delete_single_product(request, product_id):
     return redirect(reverse('delete_product'))
 
 #订单视图
-@login_required
+@business_required
 def orders(request):
     orders = Order.objects.all()  # 获取所有订单
     return render(request, 'business_orders.html', {'orders': orders})
 
 #发货按钮
-@login_required
+@business_required
 def ship_order(request, order_id):
     if request.method == 'POST':
         try:
@@ -179,7 +182,7 @@ def ship_order(request, order_id):
     return redirect('orders')
 
 #商家个人信息
-@login_required
+@business_required
 def business_profile(request):
     user_id = request.session.get('user_id')
     if not user_id:
