@@ -70,8 +70,8 @@
         <a href="{% url 'consumer_home' %}">首页</a>
         <a href="{% url 'cart_view' %}">购物车</a>
         <a href="{% url 'order_view' %}">我的订单</a>
-        {% if request.session.user_id %}
-            <a href="{% url 'user_profile' %}">用户ID: {{ request.session.user_id }}</a>
+        {% if consumer_user_id %}
+            <a href="{% url 'user_profile' %}">用户ID: {{ consumer_user_id }}</a>
         {% else %}
             <a href="{% url 'login' %}">请登录</a>
         {% endif %}
