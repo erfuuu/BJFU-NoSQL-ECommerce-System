@@ -156,6 +156,8 @@
     </div>
 
     <script>
+        sessionStorage.setItem('needRefreshClicks', 'true');
+
         function getCsrfToken() {
             const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
             return csrfToken;

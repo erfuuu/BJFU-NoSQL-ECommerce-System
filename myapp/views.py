@@ -1,6 +1,5 @@
 from datetime import datetime
 from decimal import Decimal
-from django.contrib.sessions.models import Session
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from mongoengine import DoesNotExist
@@ -14,7 +13,6 @@ def create_log(event_type, user_id=None, details=None):
     if details is None:
         details = {}
 
-    # 将 Decimal 类型转换为 float
     for key, value in details.items():
         if isinstance(value, Decimal):
             details[key] = float(value)
@@ -31,7 +29,6 @@ def create_log(event_type, user_id=None, details=None):
         print(f"Failed to save log: {e}")
 
 
-#登录视图
 def login_view(request):
     if request.method == 'POST':
         user_id = request.POST.get('user_id')
@@ -39,9 +36,9 @@ def login_view(request):
         user = UserProfile.objects(user_id=user_id, password=password).first()
 
         if user:
-            # 记录登录事件
             create_log(event_type="login", user_id=user.user_id, details={"status": "success"})
             request.session['user_id'] = user.user_id
+            request.session['user_type'] = user.type
             if user.type == 'consumer':
                 return redirect('consumer_home')
             elif user.type == 'business':
@@ -49,7 +46,6 @@ def login_view(request):
             elif user.type == 'manager':
                 return redirect('logs_view')
         else:
-            # 记录失败的登录尝试
             create_log(event_type="login", details={"user_id": user_id, "status": "failed"})
             messages.error(request, "用户名或密码错误")
 
@@ -86,22 +82,54 @@ def register_view(request):
 
     return render(request, 'register.html')
 
-# 自定义登录验证装饰器
 def login_required(view_func):
     def _wrapped_view(request, *args, **kwargs):
-        # 尝试从会话中获取用户 ID
-        session_key = request.COOKIES.get('sessionid')
-        if session_key:
+        user_id = request.session.get('user_id')
+        if user_id:
             try:
-                session = Session.objects.get(session_key=session_key)
-                session_data = session.get_decoded()
-                user_id = session_data.get('user_id')
-                # 验证用户是否存在
                 UserProfile.objects.get(user_id=user_id)
                 return view_func(request, *args, **kwargs)
-            except (Session.DoesNotExist, DoesNotExist):
+            except DoesNotExist:
                 pass
-        # 如果用户未登录，重定向到登录页面
+        return redirect('login')
+    return _wrapped_view
+
+def consumer_login_required(view_func):
+    def _wrapped_view(request, *args, **kwargs):
+        user_id = request.session.get('user_id')
+        user_type = request.session.get('user_type')
+        if user_id and user_type == 'consumer':
+            try:
+                UserProfile.objects.get(user_id=user_id)
+                return view_func(request, *args, **kwargs)
+            except DoesNotExist:
+                pass
+        return redirect('login')
+    return _wrapped_view
+
+def business_login_required(view_func):
+    def _wrapped_view(request, *args, **kwargs):
+        user_id = request.session.get('user_id')
+        user_type = request.session.get('user_type')
+        if user_id and user_type == 'business':
+            try:
+                UserProfile.objects.get(user_id=user_id)
+                return view_func(request, *args, **kwargs)
+            except DoesNotExist:
+                pass
+        return redirect('login')
+    return _wrapped_view
+
+def manager_login_required(view_func):
+    def _wrapped_view(request, *args, **kwargs):
+        user_id = request.session.get('user_id')
+        user_type = request.session.get('user_type')
+        if user_id and user_type == 'manager':
+            try:
+                UserProfile.objects.get(user_id=user_id)
+                return view_func(request, *args, **kwargs)
+            except DoesNotExist:
+                pass
         return redirect('login')
     return _wrapped_view
 

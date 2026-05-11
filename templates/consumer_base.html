@@ -103,7 +103,15 @@
             }
         };
 
-        // 显示全局消息
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'visible') {
+                if (sessionStorage.getItem('needRefreshClicks') === 'true') {
+                    sessionStorage.removeItem('needRefreshClicks');
+                    window.location.reload();
+                }
+            }
+        });
+
         function showMessage(message, success = true) {
             const globalMessage = document.getElementById("global-message");
             globalMessage.innerText = message;
