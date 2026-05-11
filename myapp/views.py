@@ -37,13 +37,14 @@ def login_view(request):
 
         if user:
             create_log(event_type="login", user_id=user.user_id, details={"status": "success"})
-            request.session['user_id'] = user.user_id
-            request.session['user_type'] = user.type
             if user.type == 'consumer':
+                request.session['consumer_user_id'] = user.user_id
                 return redirect('consumer_home')
             elif user.type == 'business':
+                request.session['business_user_id'] = user.user_id
                 return redirect('business_home')
             elif user.type == 'manager':
+                request.session['manager_user_id'] = user.user_id
                 return redirect('logs_view')
         else:
             create_log(event_type="login", details={"user_id": user_id, "status": "failed"})
@@ -84,7 +85,9 @@ def register_view(request):
 
 def login_required(view_func):
     def _wrapped_view(request, *args, **kwargs):
-        user_id = request.session.get('user_id')
+        user_id = request.session.get('consumer_user_id') or \
+                  request.session.get('business_user_id') or \
+                  request.session.get('manager_user_id')
         if user_id:
             try:
                 UserProfile.objects.get(user_id=user_id)
@@ -96,9 +99,8 @@ def login_required(view_func):
 
 def consumer_login_required(view_func):
     def _wrapped_view(request, *args, **kwargs):
-        user_id = request.session.get('user_id')
-        user_type = request.session.get('user_type')
-        if user_id and user_type == 'consumer':
+        user_id = request.session.get('consumer_user_id')
+        if user_id:
             try:
                 UserProfile.objects.get(user_id=user_id)
                 return view_func(request, *args, **kwargs)
@@ -109,9 +111,8 @@ def consumer_login_required(view_func):
 
 def business_login_required(view_func):
     def _wrapped_view(request, *args, **kwargs):
-        user_id = request.session.get('user_id')
-        user_type = request.session.get('user_type')
-        if user_id and user_type == 'business':
+        user_id = request.session.get('business_user_id')
+        if user_id:
             try:
                 UserProfile.objects.get(user_id=user_id)
                 return view_func(request, *args, **kwargs)
@@ -122,9 +123,8 @@ def business_login_required(view_func):
 
 def manager_login_required(view_func):
     def _wrapped_view(request, *args, **kwargs):
-        user_id = request.session.get('user_id')
-        user_type = request.session.get('user_type')
-        if user_id and user_type == 'manager':
+        user_id = request.session.get('manager_user_id')
+        if user_id:
             try:
                 UserProfile.objects.get(user_id=user_id)
                 return view_func(request, *args, **kwargs)

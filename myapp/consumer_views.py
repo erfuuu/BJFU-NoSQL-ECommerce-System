@@ -103,7 +103,7 @@ def product_detail_view(request, product_id):
     }
 
     # 记录商品浏览事件
-    create_log(event_type="view_product", user_id=request.session.get('user_id'), details={"product_id": product_id})
+    create_log(event_type="view_product", user_id=request.session.get('consumer_user_id'), details={"product_id": product_id})
 
     return render(request, 'product_detail.html', context)
 
@@ -112,7 +112,7 @@ def product_detail_view(request, product_id):
 def add_to_cart(request, product_id):
     if request.method == "POST":
         # 获取 session 中的 user_id
-        user_id = request.session.get('user_id')
+        user_id = request.session.get('consumer_user_id')
         if not user_id:
             return JsonResponse({"success": False, "error": "用户未登录"})
 
@@ -160,7 +160,7 @@ def add_to_cart(request, product_id):
 @consumer_login_required
 def buy_now(request, product_id):
     if request.method == "POST":
-        user_id = request.session.get('user_id')
+        user_id = request.session.get('consumer_user_id')
         data = json.loads(request.body)
         quantity = int(data.get("quantity", 1))
 
@@ -215,7 +215,7 @@ def like_comment_view(request, comment_id):
 #购物车视图
 @consumer_login_required
 def cart_view(request):
-    user_id = request.session.get('user_id')
+    user_id = request.session.get('consumer_user_id')
     in_cart_orders = Order.objects(user_id=user_id, status="In Cart")
     return render(request, 'cart.html', {'in_cart_orders': in_cart_orders})
 
@@ -223,7 +223,7 @@ def cart_view(request):
 @consumer_login_required
 def purchase_order(request, order_id):
     if request.method == "POST":
-        user_id = request.session.get('user_id')
+        user_id = request.session.get('consumer_user_id')
         order = Order.objects(order_id=order_id, user_id=user_id,status="In Cart").first()
         if order:
             order.status = "Pending"
@@ -249,7 +249,7 @@ def purchase_order(request, order_id):
 @consumer_login_required
 @require_http_methods(["DELETE"])
 def delete_order(request, order_id):
-    user_id = request.session.get('user_id')
+    user_id = request.session.get('consumer_user_id')
     order = Order.objects.filter(order_id=order_id, user_id=user_id, status="In Cart").first()
 
     if order:
@@ -261,7 +261,7 @@ def delete_order(request, order_id):
 #订单视图
 @consumer_login_required
 def order_view(request):
-    user_id = request.session.get('user_id')
+    user_id = request.session.get('consumer_user_id')
 
     # 获取时间范围参数
     start_date = request.GET.get('start_date')  # 格式: YYYY-MM-DD
@@ -303,7 +303,7 @@ def confirm_receipt(request, order_id):
 @consumer_login_required
 def add_comment_for_order(request, order_id, product_id):
     if request.method == "POST":
-        user_id = request.session.get('user_id')
+        user_id = request.session.get('consumer_user_id')
         order = Order.objects.filter(order_id=order_id, user_id=user_id).first()
 
         if order:
@@ -328,7 +328,7 @@ def add_comment_for_order(request, order_id, product_id):
 #个人信息视图
 @consumer_login_required
 def user_profile_view(request):
-    user_id = request.session.get('user_id')
+    user_id = request.session.get('consumer_user_id')
     if not user_id:
         return redirect('login')
 

@@ -182,7 +182,7 @@ def ship_order(request, order_id):
 #商家个人信息
 @business_login_required
 def business_profile(request):
-    user_id = request.session.get('user_id')
+    user_id = request.session.get('business_user_id')
     if not user_id:
         return redirect('login')
 
